@@ -2,77 +2,67 @@
 <html lang="sv">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Elpris SE4 – graf & lista (inkl. moms)</title>
+<title>Elpris SE4 – kompakt (inkl. moms)</title>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
 <meta http-equiv="Pragma" content="no-cache" />
 <meta http-equiv="Expires" content="0" />
 <style>
   :root{
-    --bg: transparent;
-    --fg: #e8edf2;
-    --muted: #cfe0f4;
-    --grid: #253044;
-    /* Dovare nivåfärger */
-    --green: #2e8f5b;
-    --yellow:#d9b43b;
-    --red:   #c34a4a;
-    --now:   #ffd166;
-    --chip:  #1a2230;
-    --chip-b:#2b3547;
-    --chip-a:#2e3a52;
+    --fg:#e8edf2; --muted:#cfe0f4; --grid:#253044; --now:#ffd166;
+    --green:#2e8f5b; --yellow:#d9b43b; --red:#c34a4a;
+    --chip:#1a2230; --chip-b:#2b3547; --chip-a:#2e3a52;
+    /* skala (sätts i JS med ResizeObserver) */
+    --s:1;
   }
-  html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
-  #wrap{display:flex;flex-direction:column;min-height:100%;gap:8px}
+  html,body{height:100%;margin:0;background:transparent;color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+  #wrap{display:flex;flex-direction:column;min-height:100%;gap:calc(6px*var(--s))}
 
-  /* Panel = endast graf/lista */
-  .panel{position:relative;flex:1;min-height:260px}
+  /* PANEL (graf/lista) */
+  .panel{position:relative;flex:1;min-height:120px}
   svg{width:100%;height:100%}
-
   .grid line{stroke:var(--grid);stroke-width:1}
-  .yLabel{fill:var(--muted);font-size:16px}
-  .xLabel{fill:var(--muted);font-size:15px}
-  .bar{opacity:.95;rx:7;ry:7}
-  .bar.now{fill:var(--now);filter:drop-shadow(0 0 6px rgba(255,209,102,.5))}
+  .yLabel{fill:var(--muted);font-size:calc(14px*var(--s))}
+  .xLabel{fill:var(--muted);font-size:calc(13px*var(--s))}
+  .bar{opacity:.95;rx:calc(7px*var(--s));ry:calc(7px*var(--s))}
+  .bar.now{fill:var(--now);filter:drop-shadow(0 0 calc(6px*var(--s)) rgba(255,209,102,.5))}
   .barLabel{
-    fill:#ffffff;font-size:18px;font-weight:700;text-anchor:middle;dominant-baseline:middle;
-    paint-order:stroke;stroke:#000;stroke-width:3px;stroke-opacity:.35;
+    fill:#fff;font-weight:700;text-anchor:middle;dominant-baseline:middle;
+    font-size:calc(18px*var(--s));
+    paint-order:stroke;stroke:#000;stroke-width:calc(3px*var(--s));stroke-opacity:.35;
   }
 
-  /* Lista */
-  .list{display:flex;flex-direction:column;gap:8px;padding:0 12px}
+  /* LISTA (avaktiverad som standard) */
+  .list{display:none;flex-direction:column;gap:calc(6px*var(--s));padding:0 calc(8px*var(--s))}
   .hdr,.rowItem{
-    display:grid;grid-template-columns:140px 150px 1fr;gap:12px;align-items:center;
-    padding:12px;border:1px solid rgba(60,75,95,.35);border-radius:12px;background:rgba(24,31,44,0.22)
+    display:grid;grid-template-columns:minmax(90px,140px) minmax(90px,140px) 1fr;gap:calc(8px*var(--s));align-items:center;
+    padding:calc(8px*var(--s));border:1px solid rgba(60,75,95,.35);border-radius:calc(10px*var(--s));background:rgba(24,31,44,.22)
   }
-  .hdr{font-weight:700;background:rgba(24,31,44,0.32)}
-  .cell-time,.cell-price{font-variant-numeric:tabular-nums;font-size:16px}
-  .meter{position:relative;height:14px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden}
+  .hdr{font-weight:700;background:rgba(24,31,44,.32)}
+  .cell-time,.cell-price{font-variant-numeric:tabular-nums;font-size:calc(14px*var(--s))}
+  .meter{height:calc(12px*var(--s));border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden}
   .meter>.fill{height:100%;border-radius:999px}
-  .nowRow{outline:2px solid var(--now);box-shadow:0 0 10px rgba(255,209,102,.35) inset}
+  .nowRow{outline:calc(2px*var(--s)) solid var(--now);box-shadow:0 0 calc(10px*var(--s)) rgba(255,209,102,.35) inset}
   .lvlGreen{background:rgba(46,143,91,.10);border-color:rgba(46,143,91,.25)}
   .lvlYellow{background:rgba(217,180,59,.10);border-color:rgba(217,180,59,.25)}
   .lvlRed{background:rgba(195,74,74,.10);border-color:rgba(195,74,74,.25)}
 
-  /* Footer under grafen (ingen overlay) */
-  .footer{
-    display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 12px 12px
-  }
-  .title{font-weight:800;font-size:20px;letter-spacing:.2px;margin-right:6px}
-  .stats{display:flex;gap:10px;flex-wrap:wrap}
-  .badge{background:var(--chip);border:1px solid var(--chip-b);border-radius:10px;padding:6px 10px;font-size:14px}
-  .meta{opacity:.95;font-size:15px;margin-left:auto;margin-right:6px}
-  .group{display:flex;gap:10px}
-  .btn{background:var(--chip);border:1px solid var(--chip-b);color:var(--fg);border-radius:12px;padding:10px 16px;font-size:15px;cursor:pointer}
+  /* FOOTER (all text/knappar under grafen, responsiv & kompakt) */
+  .footer{display:flex;flex-wrap:wrap;align-items:center;gap:calc(8px*var(--s));padding:0 calc(8px*var(--s)) calc(6px*var(--s))}
+  .title{font-weight:800;font-size:calc(18px*var(--s))}
+  .stats{display:flex;gap:calc(6px*var(--s));flex-wrap:wrap}
+  .badge{background:var(--chip);border:1px solid var(--chip-b);border-radius:calc(8px*var(--s));padding:calc(4px*var(--s)) calc(8px*var(--s));font-size:calc(12px*var(--s))}
+  .meta{opacity:.95;font-size:calc(13px*var(--s));margin-left:auto}
+  .group{display:flex;gap:calc(6px*var(--s));flex-wrap:wrap}
+  .btn{background:var(--chip);border:1px solid var(--chip-b);color:var(--fg);border-radius:calc(10px*var(--s));padding:calc(6px*var(--s)) calc(10px*var(--s));font-size:calc(13px*var(--s));cursor:pointer}
   .btn.active{background:var(--chip-a);border-color:#3d4c6a}
 </style>
 
 <div id="wrap">
   <div class="panel">
-    <svg id="chart" viewBox="0 0 1000 460" preserveAspectRatio="none" aria-label="Elprisgraf"></svg>
-    <div id="list" class="list" style="display:none"></div>
+    <svg id="chart" viewBox="0 0 1000 360" preserveAspectRatio="none" aria-label="Elprisgraf"></svg>
+    <div id="list" class="list"></div>
   </div>
 
-  <!-- All text/knappar här nere -->
   <div class="footer">
     <div class="title">Elpris SE4</div>
     <div class="stats">
@@ -93,24 +83,27 @@
 
 <script>
 (()=> {
-  const TZ = "Europe/Stockholm";
-  const VAT = 1.25;
-  const $  = s => document.querySelector(s);
-
+  const TZ="Europe/Stockholm", VAT=1.25, $=s=>document.querySelector(s);
   const chart=$("#chart"), listEl=$("#list");
   const statRange=$("#statRange"), statAvg=$("#statAvg"), statLow=$("#statLow"), statHigh=$("#statHigh"), stamp=$("#stamp");
   const btnToday=$("#btnToday"), btnTomorrow=$("#btnTomorrow"), btnChart=$("#btnChart"), btnList=$("#btnList");
-
-  const today = new Date(); const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
-
-  const bust = () => `?v=${Date.now()}`;
-  const URL_TODAY    = "./data/today.json"+bust();
-  const URL_TOMORROW = "./data/tomorrow.json"+bust();
-
+  const today=new Date(), tomorrow=new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
+  const bust=()=>`?v=${Date.now()}`;
+  const URL_TODAY="./data/today.json"+bust(), URL_TOMORROW="./data/tomorrow.json"+bust();
   let rowsToday=null, rowsTomorrow=null, currentDay="today", currentMode="chart";
 
-  async function fetchJson(u){ const r=await fetch(u,{cache:'no-store'}); if(!r.ok) throw new Error(r.status); return r.json(); }
+  /* ===== Responsiv skala beroende på höjd ===== */
+  const ro=new ResizeObserver(entries=>{
+    for(const e of entries){
+      const h=e.contentRect.height;           // tillgänglig höjd för panel+footer
+      // kalibrerad skala: ~360px bas → s=1, vid ~160px → s≈0.7, lägsta 0.6
+      const s=Math.max(0.6, Math.min(1.0, (h/360)));
+      document.documentElement.style.setProperty('--s', s.toFixed(3));
+    }
+  });
+  ro.observe(document.querySelector('#wrap'));
 
+  async function fetchJson(u){ const r=await fetch(u,{cache:'no-store'}); if(!r.ok) throw new Error(r.status); return r.json(); }
   function toSeries(rows){
     return rows.map(r=>{
       const ts=new Date(r.time_start), te=new Date(r.time_end);
@@ -120,34 +113,28 @@
       return {ts,te,value,label:s,labelRange:`${s} – ${e}`};
     });
   }
-
   function computeLevels(series){
     const arr=series.map(d=>d.value).slice().sort((a,b)=>a-b);
     const thr33=arr[Math.floor((arr.length-1)*0.33)];
     const thr66=arr[Math.floor((arr.length-1)*0.66)];
     series.forEach(d=>d.level=(d.value<=thr33)?"green":(d.value<=thr66)?"yellow":"red");
   }
-
-  function nowRounded(){
-    const n=new Date(new Date().toLocaleString('en-CA',{timeZone:TZ}));
-    n.setSeconds(0,0); n.setMinutes(Math.floor(n.getMinutes()/15)*15); return n;
-  }
-
+  function nowRounded(){ const n=new Date(new Date().toLocaleString('en-CA',{timeZone:TZ})); n.setSeconds(0,0); n.setMinutes(Math.floor(n.getMinutes()/15)*15); return n; }
   const nf0=new Intl.NumberFormat('sv-SE',{maximumFractionDigits:0});
   const fmt0=n=>nf0.format(n), fmt10=n=>nf0.format(Math.round(n/10)*10);
-
   function renderStats(series){
     const v=series.map(d=>d.value), lo=Math.min(...v), hi=Math.max(...v), avg=v.reduce((a,b)=>a+b,0)/v.length;
     const iLo=v.indexOf(lo), iHi=v.indexOf(hi);
     statRange.textContent=`Intervall: ${fmt10(lo)}–${fmt10(hi)} öre/kWh`;
-    statAvg.textContent=`Medel: ${fmt0(avg)} öre/kWh`;
-    statLow.textContent=`Lägst: ${fmt0(lo)} öre/kWh (${series[iLo].label})`;
-    statHigh.textContent=`Högst: ${fmt0(hi)} öre/kWh (${series[iHi].label})`;
+    statAvg.textContent  =`Medel: ${fmt0(avg)} öre/kWh`;
+    statLow.textContent  =`Lägst: ${fmt0(lo)} öre/kWh (${series[iLo].label})`;
+    statHigh.textContent =`Högst: ${fmt0(hi)} öre/kWh (${series[iHi].label})`;
   }
 
   function drawChart(series){
-    // extra plats i botten för x-etiketter; footer ligger utanför grafen
-    const W=1000,H=460,padL=16,padR=60,padT=8,padB=56;
+    const s=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--s'))||1;
+    // mer kompakt: mindre bottenpadding så tiderna kommer nära staplarna
+    const W=1000,H=360,padL=12,padR=56,padT=6,padB=Math.max(36, 46*s);  // etiketter nära staplar
     chart.setAttribute("viewBox",`0 0 ${W} ${H}`); chart.innerHTML="";
     const vals=series.map(d=>d.value), vMin=Math.min(...vals), vMax=Math.max(...vals);
     const niceMax=Math.ceil(vMax/10)*10, niceMin=Math.floor(Math.min(vMin,0)/10)*10;
@@ -171,27 +158,34 @@
     chart.appendChild(g);
 
     const nowRef=nowRounded();
+    // bestäm hur täta tids-etiketter vi får plats med
+    let every=1;
+    if(barW < 26) every=2;
+    if(barW < 18) every=3;
+    if(barW < 14) every=4;
 
     for(let i=0;i<n;i++){
       const d=series[i], x=xAt(i), y=yScale(d.value), h=Math.max(1,(padT+plotH)-y);
       const r=document.createElementNS("http://www.w3.org/2000/svg","rect");
-      r.setAttribute("x",x); r.setAttribute("y",y); r.setAttribute("width",barW); r.setAttribute("height",h); r.setAttribute("rx","7"); r.setAttribute("ry","7");
+      r.setAttribute("x",x); r.setAttribute("y",y); r.setAttribute("width",barW); r.setAttribute("height",h);
+      r.setAttribute("rx", 7*s); r.setAttribute("ry", 7*s);
       r.style.fill = (d.level==="green")?"var(--green)":(d.level==="yellow")?"var(--yellow)":"var(--red)";
       const same=(a,b)=>a.getFullYear()==b.getFullYear()&&a.getMonth()==b.getMonth()&&a.getDate()==b.getDate()&&a.getHours()==b.getHours()&&a.getMinutes()==b.getMinutes();
       r.setAttribute("class", same(d.ts,nowRef) ? "bar now" : "bar");
       chart.appendChild(r);
 
-      // x-etiketter nära staplarna
-      const showLabel=(n===24) ? true : (i%4===0);
-      if(showLabel){
+      // tidsetiketter nära stapeln
+      const isQuarter = n>48;
+      const show = (i%every===0) && (isQuarter ? i%4===0 : true);
+      if(show){
         const t=document.createElementNS("http://www.w3.org/2000/svg","text");
-        t.setAttribute("x",x+barW/2); t.setAttribute("y",H-14);
+        t.setAttribute("x",x+barW/2); t.setAttribute("y",H-6); // väldigt nära botten
         t.setAttribute("text-anchor","middle"); t.setAttribute("class","xLabel"); t.textContent=d.label;
         chart.appendChild(t);
       }
 
-      // pris i stapeln om >= 30 öre
-      if(d.value>=30 && h>32){
+      // pris i stapeln om tillräckligt högt och skalan inte för liten
+      if(d.value>=30 && h > (30*s) && s>=0.72){
         const lbl=document.createElementNS("http://www.w3.org/2000/svg","text");
         lbl.setAttribute("class","barLabel");
         const cx=x+barW/2, cy=y+h/2;
@@ -204,18 +198,17 @@
 
   function drawList(series){
     listEl.innerHTML="";
+    listEl.style.display="flex";
     const hdr=document.createElement("div"); hdr.className="hdr"; hdr.innerHTML="<div>Timme</div><div>Pris per kWh</div><div>Prisnivå</div>";
     listEl.appendChild(hdr);
-
     const nowRef=nowRounded();
-    const vals=series.map(d=>d.value), vMin=Math.min(...vals), vMax=Math.max(...vals);
+    const vals=series.map(d=>d.value); const vMin=Math.min(...vals), vMax=Math.max(...vals);
 
     for(const d of series){
       const row=document.createElement("div"); row.className="rowItem";
       row.classList.add(d.level==="green"?"lvlGreen":d.level==="yellow"?"lvlYellow":"lvlRed");
       const same=(a,b)=>a.getFullYear()==b.getFullYear()&&a.getMonth()==b.getMonth()&&a.getDate()==b.getDate()&&a.getHours()==b.getHours()&&a.getMinutes()==b.getMinutes();
       if(same(d.ts,nowRef)) row.classList.add("nowRow");
-
       const cTime=document.createElement("div"); cTime.className="cell-time"; cTime.textContent=d.labelRange;
       const cPrice=document.createElement("div"); cPrice.className="cell-price"; cPrice.textContent=`${fmt0(d.value)} öre`;
       const cLevel=document.createElement("div");
@@ -237,10 +230,10 @@
 
   function render(){
     const rows=(currentDay==="today")?rowsToday:rowsTomorrow;
-    if(!rows||!rows.length){ chart.innerHTML=""; listEl.innerHTML=""; return; }
+    if(!rows||!rows.length){ chart.innerHTML=""; listEl.style.display="none"; return; }
     const series=toSeries(rows); computeLevels(series); renderStats(series); stampDate(currentDay==="today");
-    if(currentMode==="chart"){ chart.style.display="block"; listEl.style.display="none"; drawChart(series); }
-    else { chart.style.display="none"; listEl.style.display="flex"; drawList(series); }
+    if(currentMode==="chart"){ listEl.style.display="none"; drawChart(series); }
+    else { drawList(series); }
   }
 
   function updateBtns(){
