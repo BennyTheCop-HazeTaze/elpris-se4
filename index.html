@@ -56,7 +56,6 @@
 
 <script>
 (()=> {
-  const ZONE = "SE4";
   const TZ   = "Europe/Stockholm";
   const $ = s => document.querySelector(s);
   const fmt = n => new Intl.NumberFormat('sv-SE',{maximumFractionDigits:0}).format(n);
@@ -66,18 +65,20 @@
         statLow=$("#statLow"), statHigh=$("#statHigh"), stamp=$("#stamp"),
         toggle=$("#dayToggle");
 
-  const local = d => new Date(d.toLocaleString('en-CA',{timeZone:TZ}));
-  const today = local(new Date());
+  const today = new Date();
   const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
 
-  const buildURL = d => {
-    const y=d.getFullYear(), mm=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
-    return `https://www.elprisetjustnu.se/api/v1/prices/${y}/${mm}-${dd}_${ZONE}.json`;
+  const URL_TODAY    = "./data/today.json";
+  const URL_TOMORROW = "./data/tomorrow.json";
+
+  let dataToday=null, dataTomorrow=null;
+
+  const fetchJson = async u => {
+    const r = await fetch(u, {cache:'no-store'});
+    if (!r.ok) throw new Error("HTTP "+r.status);
+    return r.json();
   };
 
-  let dataToday=null, dataTomorrow=null, showing="today";
-
-  const fetchJson = async u => (await fetch(u,{cache:'no-store'})).json();
   const toSeries = rows => rows.map(r=>{
     const ts = new Date(r.time_start);
     const valueOre = r.SEK_per_kWh*100;
@@ -88,6 +89,16 @@
   function draw(series){
     const W=1000,H=420,padL=46,padR=12,padT=18,padB=40;
     chart.setAttribute("viewBox",`0 0 ${W} ${H}`); chart.innerHTML="";
+
+    if(!series.length){
+      const t=document.createElementNS("http://www.w3.org/2000/svg","text");
+      t.setAttribute("x", W/2); t.setAttribute("y", H/2);
+      t.setAttribute("text-anchor","middle"); t.setAttribute("class","yLabel");
+      t.textContent="Ingen data ännu";
+      chart.appendChild(t);
+      return;
+    }
+
     const values = series.map(d=>d.value);
     const vMin = Math.min(...values), vMax = Math.max(...values);
     const niceMax = Math.ceil(vMax/10)*10, niceMin = Math.floor(Math.min(vMin,0)/10)*10;
@@ -110,7 +121,7 @@
     }
     chart.appendChild(gGrid);
 
-    const nowLocal = local(new Date());
+    const nowLocal = new Date(new Date().toLocaleString('en-CA',{timeZone:TZ}));
     const round15 = d=>{const t=new Date(d); t.setMinutes(Math.floor(t.getMinutes()/15)*15,0,0); return t;};
     const refNow = round15(nowLocal);
 
@@ -132,27 +143,35 @@
     }
     const avg = values.reduce((a,b)=>a+b,0)/values.length;
     const lo=Math.min(...values), hi=Math.max(...values), iLo=values.indexOf(lo), iHi=values.indexOf(hi);
-    statRange.textContent=`Intervall: ${fmt(niceMin)}–${fmt(niceMax)} öre/kWh`;
+    statRange.textContent=`Intervall: ${fmt(Math.floor(lo/10)*10)}–${fmt(Math.ceil(hi/10)*10)} öre/kWh`;
     statAvg.textContent=`Medel: ${fmt(avg)} öre/kWh`;
     statLow.textContent=`Lägst: ${fmt(lo)} öre/kWh (${series[iLo].label})`;
     statHigh.textContent=`Högst: ${fmt(hi)} öre/kWh (${series[iHi].label})`;
   }
 
-  function render(which){
-    const rows = (which==="today"?dataToday:dataTomorrow);
-    if(!rows) return;
+  function renderDay(rows, isToday){
     draw(toSeries(rows));
-    stamp.textContent = (which==="today"?`Idag ${dtFmt(today)}`:`Imorgon ${dtFmt(tomorrow)}`);
-    toggle.querySelectorAll("button").forEach(b=>b.classList.toggle("active", b.dataset.day===which));
+    const baseDate = isToday ? today : tomorrow;
+    stamp.textContent = (isToday?`Idag `:`Imorgon `) + dtFmt(baseDate);
   }
 
   async function init(){
-    try{ dataToday = await fetchJson(buildURL(today)); }catch(e){ console.error(e); }
-    try{ dataTomorrow = await fetchJson(buildURL(tomorrow)); }catch(e){ dataTomorrow=null; }
-    if(dataToday) render("today");
-    if(dataTomorrow){
-      toggle.style.display="flex";
-      toggle.onclick = ev => { if(ev.target.tagName==="BUTTON") render(ev.target.dataset.day); };
+    try { dataToday = await fetchJson(URL_TODAY); } catch(e){ dataToday = []; }
+    try { dataTomorrow = await fetchJson(URL_TOMORROW); } catch(e){ dataTomorrow = null; }
+
+    if (Array.isArray(dataToday)) renderDay(dataToday, true);
+
+    if (Array.isArray(dataTomorrow)) {
+      const tg = document.getElementById("dayToggle");
+      tg.style.display = "flex";
+      tg.onclick = ev => {
+        if (ev.target.tagName === "BUTTON") {
+          tg.querySelectorAll("button").forEach(b=>b.classList.remove("active"));
+          ev.target.classList.add("active");
+          if (ev.target.dataset.day === "tomorrow") renderDay(dataTomorrow, false);
+          else renderDay(dataToday, true);
+        }
+      };
     }
   }
 
