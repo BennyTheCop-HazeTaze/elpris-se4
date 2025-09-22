@@ -4,8 +4,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Elpris SE4 – stapelgraf</title>
 <style>
-  html,body{height:100%;margin:0;background:#0b0e12;color:#e8edf2;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
-  #wrap{display:flex;flex-direction:column;height:100%;padding:12px;box-sizing:border-box}
+  html,body{height:100%;margin:0;background:transparent;color:#e8edf2;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+  #wrap{display:flex;flex-direction:column;height:100%;padding:12px;box-sizing:border-box;background:rgba(11,14,18,0)} /* helt transparent */
   .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .title{font-weight:600;font-size:18px;letter-spacing:.2px}
   .meta{opacity:.8;font-size:13px}
@@ -24,6 +24,7 @@
   .badge{background:#1a2230;border:1px solid #2b3547;border-radius:8px;padding:2px 8px}
   .src{display:flex;align-items:center;gap:6px;margin-top:6px;opacity:.8;font-size:11px}
   .src img{height:18px}
+  .err{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;color:#ffdfdf;background:rgba(0,0,0,0.0);font-size:14px}
 </style>
 
 <div id="wrap">
@@ -44,7 +45,10 @@
     <div class="meta" id="stamp"></div>
   </div>
 
-  <div class="chartWrap"><svg id="chart" viewBox="0 0 1000 420" preserveAspectRatio="none" aria-label="Elprisgraf"></svg></div>
+  <div class="chartWrap">
+    <svg id="chart" viewBox="0 0 1000 420" preserveAspectRatio="none" aria-label="Elprisgraf"></svg>
+    <div id="err" class="err" style="display:none"></div>
+  </div>
   <div class="hint">Öre/kWh. Exkl. skatter/påslag. Nuvarande period markeras gult.</div>
   <div class="src">
     <a href="https://www.elprisetjustnu.se" target="_blank" rel="noreferrer">
@@ -63,21 +67,22 @@
 
   const chart=$("#chart"), statRange=$("#statRange"), statAvg=$("#statAvg"),
         statLow=$("#statLow"), statHigh=$("#statHigh"), stamp=$("#stamp"),
-        toggle=$("#dayToggle");
+        toggle=$("#dayToggle"), err=$("#err");
 
-  const today = new Date();
-  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
+  const today = new Date(); const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
 
-  const URL_TODAY    = "./data/today.json";
-  const URL_TOMORROW = "./data/tomorrow.json";
+  // Cache-bust: lägg på ?v=timestamp
+  const bust = () => `?v=${Date.now()}`;
+  const URL_TODAY    = "./data/today.json"    + bust();
+  const URL_TOMORROW = "./data/tomorrow.json" + bust();
 
   let dataToday=null, dataTomorrow=null;
 
-  const fetchJson = async u => {
+  async function fetchJson(u){
     const r = await fetch(u, {cache:'no-store'});
-    if (!r.ok) throw new Error("HTTP "+r.status);
+    if(!r.ok) throw new Error(`HTTP ${r.status} på ${u}`);
     return r.json();
-  };
+  }
 
   const toSeries = rows => rows.map(r=>{
     const ts = new Date(r.time_start);
@@ -86,16 +91,17 @@
     return {ts,label,value:valueOre};
   });
 
+  function showError(msg){
+    err.style.display="flex"; err.textContent = msg;
+    chart.innerHTML="";
+  }
+
   function draw(series){
     const W=1000,H=420,padL=46,padR=12,padT=18,padB=40;
     chart.setAttribute("viewBox",`0 0 ${W} ${H}`); chart.innerHTML="";
 
     if(!series.length){
-      const t=document.createElementNS("http://www.w3.org/2000/svg","text");
-      t.setAttribute("x", W/2); t.setAttribute("y", H/2);
-      t.setAttribute("text-anchor","middle"); t.setAttribute("class","yLabel");
-      t.textContent="Ingen data ännu";
-      chart.appendChild(t);
+      showError("Ingen data ännu. Kontrollera att /data/today.json finns och uppdateras av GitHub Actions.");
       return;
     }
 
@@ -149,27 +155,30 @@
     statHigh.textContent=`Högst: ${fmt(hi)} öre/kWh (${series[iHi].label})`;
   }
 
-  function renderDay(rows, isToday){
-    draw(toSeries(rows));
-    const baseDate = isToday ? today : tomorrow;
-    stamp.textContent = (isToday?`Idag `:`Imorgon `) + dtFmt(baseDate);
-  }
-
   async function init(){
+    err.style.display="none";
     try { dataToday = await fetchJson(URL_TODAY); } catch(e){ dataToday = []; }
     try { dataTomorrow = await fetchJson(URL_TOMORROW); } catch(e){ dataTomorrow = null; }
 
-    if (Array.isArray(dataToday)) renderDay(dataToday, true);
+    if (Array.isArray(dataToday) && dataToday.length) {
+      draw(toSeries(dataToday));
+      stamp.textContent = "Idag " + dtFmt(today);
+    } else {
+      showError("Ingen data för idag. Testa ladda om eller se att Actions skapade /data/today.json.");
+    }
 
-    if (Array.isArray(dataTomorrow)) {
+    if (Array.isArray(dataTomorrow) && dataTomorrow.length) {
       const tg = document.getElementById("dayToggle");
       tg.style.display = "flex";
       tg.onclick = ev => {
         if (ev.target.tagName === "BUTTON") {
           tg.querySelectorAll("button").forEach(b=>b.classList.remove("active"));
           ev.target.classList.add("active");
-          if (ev.target.dataset.day === "tomorrow") renderDay(dataTomorrow, false);
-          else renderDay(dataToday, true);
+          if (ev.target.dataset.day === "tomorrow") {
+            draw(toSeries(dataTomorrow)); stamp.textContent = "Imorgon " + dtFmt(tomorrow);
+          } else {
+            draw(toSeries(dataToday));    stamp.textContent = "Idag " + dtFmt(today);
+          }
         }
       };
     }
