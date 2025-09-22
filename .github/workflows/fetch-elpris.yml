@@ -1,0 +1,44 @@
+name: Fetch elpriser (SE4)
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"   # kör var 30:e minut
+  workflow_dispatch:         # så du kan köra manuellt vid behov
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Hämta elpris-data (SE4) och spara i /data
+        run: |
+          set -e
+          mkdir -p data
+
+          # Datum i svensk tid
+          TODAY_PATH=$(TZ=Europe/Stockholm date +%Y/%m-%d)
+          TOMORROW_PATH=$(TZ=Europe/Stockholm date -d "tomorrow" +%Y/%m-%d)
+
+          # Dagens priser
+          curl -fsSL "https://www.elprisetjustnu.se/api/v1/prices/${TODAY_PATH}_SE4.json" -o data/today.json
+
+          # Morgondagens priser (kan saknas före ~13:15, då hoppar vi över)
+          if curl -fsSL "https://www.elprisetjustnu.se/api/v1/prices/${TOMORROW_PATH}_SE4.json" -o data/tomorrow.json ; then
+            echo "Imorgon-data hämtad"
+          else
+            echo "Imorgon-data ej tillgänglig ännu – behåller ev. tidigare fil om den finns."
+          fi
+
+      - name: Commit & push om något ändrats
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "Update elpriser data"
+            git push
+          else
+            echo "Inga ändringar"
+          fi
