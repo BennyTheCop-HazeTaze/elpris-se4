@@ -2,40 +2,77 @@
 <html lang="sv">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Elpris SE4 – stapelgraf</title>
+<title>Elpris SE4 – graf & lista (inkl. moms)</title>
 <style>
-  html,body{height:100%;margin:0;background:transparent;color:#e8edf2;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
-  #wrap{display:flex;flex-direction:column;height:100%;padding:12px;box-sizing:border-box;background:rgba(11,14,18,0)} /* helt transparent */
-  .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-  .title{font-weight:600;font-size:18px;letter-spacing:.2px}
-  .meta{opacity:.8;font-size:13px}
-  .toggle{margin-left:auto;display:flex;gap:6px}
-  .toggle button{background:#1a2230;border:1px solid #2b3547;color:#c9d7e6;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer}
-  .toggle button.active{background:#2e3a52;color:white;border-color:#3d4c6a}
-  .stats{display:flex;gap:14px;font-size:13px;opacity:.9;flex-wrap:wrap}
-  .chartWrap{position:relative;flex:1;min-height:260px;height:100%;margin-top:8px}
+  :root{
+    --bg: transparent;
+    --fg: #e8edf2;
+    --muted: #a9b8cc;
+    --panel: rgba(16,22,31,0.0);
+    --bar: #7fb3ff;
+    --bar-now: #ffd166;
+    --green: #33b566;
+    --yellow:#eacb39;
+    --red:   #e05555;
+    --grid: #253044;
+  }
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+  #wrap{display:flex;flex-direction:column;height:100%;padding:12px;box-sizing:border-box;background:var(--panel)}
+  .row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .title{font-weight:700;font-size:20px;letter-spacing:.2px}
+  .meta{opacity:.95;font-size:14px}
+  .group{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap}
+  .btn{
+    background:#1a2230;border:1px solid #2b3547;color:var(--fg);
+    border-radius:12px;padding:10px 16px;font-size:14px;cursor:pointer;user-select:none
+  }
+  .btn.active{background:#2e3a52;color:#fff;border-color:#3d4c6a}
+  .stats{display:flex;gap:14px;font-size:14px;opacity:.95;flex-wrap:wrap}
+  .badge{background:#1a2230;border:1px solid #2b3547;border-radius:10px;padding:4px 10px}
+  .panel{position:relative;flex:1;min-height:260px;height:100%;margin-top:10px}
+
+  /* Chart */
   svg{width:100%;height:100%}
-  .bar{fill:#7fb3ff;opacity:.9}
-  .bar.now{fill:#ffd166}
-  .grid line{stroke:#253044;stroke-width:1}
-  .yLabel{fill:#a9b8cc;font-size:11px}
-  .xLabel{fill:#95a7bd;font-size:10px}
-  .hint{font-size:11px;opacity:.7;margin-top:4px}
-  .badge{background:#1a2230;border:1px solid #2b3547;border-radius:8px;padding:2px 8px}
-  .src{display:flex;align-items:center;gap:6px;margin-top:6px;opacity:.8;font-size:11px}
-  .src img{height:18px}
-  .err{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;color:#ffdfdf;background:rgba(0,0,0,0.0);font-size:14px}
+  .grid line{stroke:var(--grid);stroke-width:1}
+  .yLabel{fill:#cfe0f4;font-size:14px}
+  .xLabel{fill:#cfe0f4;font-size:13px}
+  .bar{fill:var(--bar);opacity:.95}
+  .bar.now{fill:var(--bar-now);filter:drop-shadow(0 0 6px rgba(255,209,102,.5))}
+  /* rounded tops for bars */
+  .bar{rx:6; ry:6}
+
+  /* List view */
+  .list{display:flex;flex-direction:column;gap:8px}
+  .hdr,.rowItem{
+    display:grid;grid-template-columns:120px 130px 1fr;gap:12px;align-items:center;
+    padding:10px 12px;border:1px solid rgba(60,75,95,.35);border-radius:12px;background:rgba(24,31,44,0.25)
+  }
+  .hdr{font-weight:600;background:rgba(24,31,44,0.35)}
+  .cell-time{font-variant-numeric:tabular-nums}
+  .cell-price{font-variant-numeric:tabular-nums}
+  .meter{
+    position:relative;height:12px;border-radius:999px;background:rgba(255,255,255,0.08);overflow:hidden
+  }
+  .meter > .fill{height:100%;border-radius:999px}
+  .tag{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.15);opacity:.9}
+  .nowRow{outline:2px solid var(--bar-now); box-shadow:0 0 10px rgba(255,209,102,.4) inset}
+  .lvlGreen{background:rgba(51,181,102,.15); border-color:rgba(51,181,102,.35)}
+  .lvlYellow{background:rgba(234,203,57,.12); border-color:rgba(234,203,57,.30)}
+  .lvlRed{background:rgba(224,85,85,.12); border-color:rgba(224,85,85,.30)}
 </style>
 
 <div id="wrap">
   <div class="row">
-    <div class="title">Elpris SE4 – stapelgraf</div>
-    <div class="toggle" id="dayToggle" style="display:none">
-      <button data-day="today" class="active">Idag</button>
-      <button data-day="tomorrow">Imorgon</button>
+    <div class="title">Elpris SE4 – graf & lista (inkl. moms)</div>
+    <div class="group">
+      <button class="btn active" data-day="today" id="btnToday">Idag</button>
+      <button class="btn" data-day="tomorrow" id="btnTomorrow">Imorgon</button>
+      <button class="btn active" data-mode="chart" id="btnChart">Graf</button>
+      <button class="btn" data-mode="list" id="btnList">Lista</button>
     </div>
   </div>
-  <div class="row" style="margin-top:2px">
+
+  <div class="row" style="margin-top:4px">
     <div class="stats">
       <span id="statRange" class="badge">–</span>
       <span id="statAvg"   class="badge">–</span>
@@ -45,74 +82,102 @@
     <div class="meta" id="stamp"></div>
   </div>
 
-  <div class="chartWrap">
+  <div class="panel" id="panel">
     <svg id="chart" viewBox="0 0 1000 420" preserveAspectRatio="none" aria-label="Elprisgraf"></svg>
-    <div id="err" class="err" style="display:none"></div>
-  </div>
-  <div class="hint">Öre/kWh. Exkl. skatter/påslag. Nuvarande period markeras gult.</div>
-  <div class="src">
-    <a href="https://www.elprisetjustnu.se" target="_blank" rel="noreferrer">
-      <img alt="Källa: elprisetjustnu.se" src="https://i.bnfcl.io/hva-koster-strommen/elpriser-tillhandahalls-av-elprisetjustnu_ttNExOIU_.png">
-    </a>
-    <span>Elpriser tillhandahålls av elprisetjustnu.se</span>
+    <div id="list" class="list" style="display:none"></div>
   </div>
 </div>
 
 <script>
 (()=> {
-  const TZ   = "Europe/Stockholm";
+  const TZ = "Europe/Stockholm";
+  const VAT = 1.25;    // 25% moms
   const $ = s => document.querySelector(s);
-  const fmt = n => new Intl.NumberFormat('sv-SE',{maximumFractionDigits:0}).format(n);
-  const dtFmt = d => new Intl.DateTimeFormat('sv-SE',{weekday:'short',day:'2-digit',month:'short'}).format(d);
 
-  const chart=$("#chart"), statRange=$("#statRange"), statAvg=$("#statAvg"),
-        statLow=$("#statLow"), statHigh=$("#statHigh"), stamp=$("#stamp"),
-        toggle=$("#dayToggle"), err=$("#err");
+  const chart=$("#chart"), listEl=$("#list"), panel=$("#panel");
+  const statRange=$("#statRange"), statAvg=$("#statAvg"), statLow=$("#statLow"), statHigh=$("#statHigh"), stamp=$("#stamp");
+  const btnToday=$("#btnToday"), btnTomorrow=$("#btnTomorrow"), btnChart=$("#btnChart"), btnList=$("#btnList");
 
-  const today = new Date(); const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
+  const today = new Date();
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
 
-  // Cache-bust: lägg på ?v=timestamp
+  // read local files produced by the Action (cache-busted)
   const bust = () => `?v=${Date.now()}`;
   const URL_TODAY    = "./data/today.json"    + bust();
   const URL_TOMORROW = "./data/tomorrow.json" + bust();
 
-  let dataToday=null, dataTomorrow=null;
+  let rowsToday=null, rowsTomorrow=null, currentDay="today", currentMode="chart";
 
   async function fetchJson(u){
-    const r = await fetch(u, {cache:'no-store'});
-    if(!r.ok) throw new Error(`HTTP ${r.status} på ${u}`);
+    const r = await fetch(u,{cache:'no-store'});
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
     return r.json();
   }
 
-  const toSeries = rows => rows.map(r=>{
-    const ts = new Date(r.time_start);
-    const valueOre = r.SEK_per_kWh*100;
-    const label = ts.toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit',timeZone:TZ});
-    return {ts,label,value:valueOre};
-  });
-
-  function showError(msg){
-    err.style.display="flex"; err.textContent = msg;
-    chart.innerHTML="";
+  function toSeries(rows){
+    return rows.map(r=>{
+      const ts = new Date(r.time_start);
+      const te = new Date(r.time_end);
+      const value = (r.SEK_per_kWh||0)*100*VAT; // öre inkl. moms
+      const labelStart = ts.toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit',timeZone:TZ});
+      const labelEnd   = te.toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit',timeZone:TZ});
+      const slotMins = Math.round((te - ts)/60000);
+      return {ts, te, value, label: labelStart, labelRange: `${labelStart} – ${labelEnd}`, minutes: slotMins};
+    });
   }
 
-  function draw(series){
-    const W=1000,H=420,padL=46,padR=12,padT=18,padB=40;
+  function computeLevels(series){
+    // färga enligt dag-fördelning: 0–33% grön, 34–66% gul, 67–100% röd
+    const values = series.map(d=>d.value).slice().sort((a,b)=>a-b);
+    const idx33 = Math.floor((values.length-1)*0.33);
+    const idx66 = Math.floor((values.length-1)*0.66);
+    const thr33 = values[idx33];
+    const thr66 = values[idx66];
+    series.forEach(d=>{
+      if (d.value <= thr33) d.level="green";
+      else if (d.value <= thr66) d.level="yellow";
+      else d.level="red";
+    });
+    return {thr33,thr66};
+  }
+
+  function renderStats(series){
+    const vals = series.map(d=>d.value);
+    const lo = Math.min(...vals), hi = Math.max(...vals);
+    const avg = vals.reduce((a,b)=>a+b,0)/vals.length;
+    const iLo = vals.indexOf(lo), iHi = vals.indexOf(hi);
+    statRange.textContent = `Intervall: ${fmt10(lo)}–${fmt10(hi)} öre/kWh`;
+    statAvg.textContent   = `Medel: ${fmt0(avg)} öre/kWh`;
+    statLow.textContent   = `Lägst: ${fmt0(lo)} öre/kWh (${series[iLo].label})`;
+    statHigh.textContent  = `Högst: ${fmt0(hi)} öre/kWh (${series[iHi].label})`;
+  }
+
+  const nf0 = new Intl.NumberFormat('sv-SE',{maximumFractionDigits:0});
+  function fmt0(n){ return nf0.format(n); }
+  function fmt10(n){ return nf0.format(Math.round(n/10)*10); }
+
+  function nowRounded(){
+    const n = new Date(new Date().toLocaleString('en-CA',{timeZone:TZ}));
+    n.setSeconds(0,0);
+    const m = n.getMinutes();
+    // round down to 15 for quarter compatibility
+    n.setMinutes(Math.floor(m/15)*15);
+    return n;
+  }
+
+  function drawChart(series){
+    const W=1000,H=420,padL=50,padR=12,padT=18,padB=44;
     chart.setAttribute("viewBox",`0 0 ${W} ${H}`); chart.innerHTML="";
-
-    if(!series.length){
-      showError("Ingen data ännu. Kontrollera att /data/today.json finns och uppdateras av GitHub Actions.");
-      return;
-    }
-
-    const values = series.map(d=>d.value);
-    const vMin = Math.min(...values), vMax = Math.max(...values);
+    const vals = series.map(d=>d.value);
+    const vMin = Math.min(...vals), vMax = Math.max(...vals);
     const niceMax = Math.ceil(vMax/10)*10, niceMin = Math.floor(Math.min(vMin,0)/10)*10;
-    const plotW=W-padL-padR, plotH=H-padT-padB, n=series.length, gap=2;
+    const plotW=W-padL-padR, plotH=H-padT-padB;
+    const n=series.length, gap=2;
     const barW=Math.max((plotW-(n-1)*gap)/n,2);
     const yScale=v=> padT+(1-(v-niceMin)/(niceMax-niceMin))*plotH;
     const xAt=i=> padL+i*(barW+gap);
 
+    // grid
     const gGrid = document.createElementNS("http://www.w3.org/2000/svg","g");
     gGrid.setAttribute("class","grid");
     const ticks=5;
@@ -122,69 +187,154 @@
       line.setAttribute("x1",padL); line.setAttribute("x2",W-padR);
       line.setAttribute("y1",y); line.setAttribute("y2",y); gGrid.appendChild(line);
       const t=document.createElementNS("http://www.w3.org/2000/svg","text");
-      t.setAttribute("x",padL-8); t.setAttribute("y",y+4); t.setAttribute("text-anchor","end"); t.setAttribute("class","yLabel");
-      t.textContent=fmt(v); gGrid.appendChild(t);
+      t.setAttribute("x",padL-8); t.setAttribute("y",y+5);
+      t.setAttribute("text-anchor","end"); t.setAttribute("class","yLabel"); t.textContent=fmt0(v);
+      gGrid.appendChild(t);
     }
     chart.appendChild(gGrid);
 
-    const nowLocal = new Date(new Date().toLocaleString('en-CA',{timeZone:TZ}));
-    const round15 = d=>{const t=new Date(d); t.setMinutes(Math.floor(t.getMinutes()/15)*15,0,0); return t;};
-    const refNow = round15(nowLocal);
-
+    const nowRef = nowRounded();
     for(let i=0;i<n;i++){
       const d=series[i], x=xAt(i), y=yScale(d.value), h=Math.max(1,(padT+plotH)-y);
       const rect=document.createElementNS("http://www.w3.org/2000/svg","rect");
-      rect.setAttribute("x",x); rect.setAttribute("y",y); rect.setAttribute("width",barW); rect.setAttribute("height",h);
+      rect.setAttribute("x",x); rect.setAttribute("y",y);
+      rect.setAttribute("width",barW); rect.setAttribute("height",h);
       rect.setAttribute("class","bar");
+      rect.setAttribute("rx","6"); rect.setAttribute("ry","6");
+
+      // color by level
+      if(d.level==="green") rect.style.fill="var(--green)";
+      else if(d.level==="yellow") rect.style.fill="var(--yellow)";
+      else rect.style.fill="var(--red)";
+
       const same=(a,b)=>a.getFullYear()==b.getFullYear()&&a.getMonth()==b.getMonth()&&a.getDate()==b.getDate()&&a.getHours()==b.getHours()&&a.getMinutes()==b.getMinutes();
-      if(same(d.ts,refNow)) rect.setAttribute("class","bar now");
+      if(same(d.ts, nowRef)) rect.setAttribute("class","bar now");
+
       chart.appendChild(rect);
 
-      const labelEach = (n===24) ? true : (i%4===0);
-      if(labelEach){
+      const showLabel = (n===24) ? true : (i%4===0);
+      if(showLabel){
         const t=document.createElementNS("http://www.w3.org/2000/svg","text");
-        t.setAttribute("x",x+barW/2); t.setAttribute("y",H-18); t.setAttribute("text-anchor","middle"); t.setAttribute("class","xLabel");
-        t.textContent=d.label; chart.appendChild(t);
+        t.setAttribute("x", x + barW/2); t.setAttribute("y", H-16);
+        t.setAttribute("text-anchor","middle"); t.setAttribute("class","xLabel");
+        t.textContent = d.label;
+        chart.appendChild(t);
       }
     }
-    const avg = values.reduce((a,b)=>a+b,0)/values.length;
-    const lo=Math.min(...values), hi=Math.max(...values), iLo=values.indexOf(lo), iHi=values.indexOf(hi);
-    statRange.textContent=`Intervall: ${fmt(Math.floor(lo/10)*10)}–${fmt(Math.ceil(hi/10)*10)} öre/kWh`;
-    statAvg.textContent=`Medel: ${fmt(avg)} öre/kWh`;
-    statLow.textContent=`Lägst: ${fmt(lo)} öre/kWh (${series[iLo].label})`;
-    statHigh.textContent=`Högst: ${fmt(hi)} öre/kWh (${series[iHi].label})`;
+  }
+
+  function drawList(series){
+    listEl.innerHTML="";
+
+    // header
+    const hdr = document.createElement("div");
+    hdr.className="hdr";
+    hdr.innerHTML = `<div>Timme</div><div>Pris per kWh</div><div>Prisnivå</div>`;
+    listEl.appendChild(hdr);
+
+    const nowRef = nowRounded();
+
+    // length for percent fill scale
+    const vals = series.map(d=>d.value);
+    const vMin = Math.min(...vals), vMax = Math.max(...vals);
+
+    for(const d of series){
+      const row = document.createElement("div");
+      row.className="rowItem";
+      // level class for subtle background
+      if(d.level==="green") row.classList.add("lvlGreen");
+      else if(d.level==="yellow") row.classList.add("lvlYellow");
+      else row.classList.add("lvlRed");
+
+      // highlight current slot
+      const same=(a,b)=>a.getFullYear()==b.getFullYear()&&a.getMonth()==b.getMonth()&&a.getDate()==b.getDate()&&a.getHours()==b.getHours()&&a.getMinutes()==b.getMinutes();
+      if(same(d.ts, nowRef)) row.classList.add("nowRow");
+
+      // time / price cells
+      const cTime = document.createElement("div");
+      cTime.className="cell-time";
+      cTime.textContent = d.labelRange;
+
+      const cPrice = document.createElement("div");
+      cPrice.className="cell-price";
+      cPrice.textContent = `${fmt0(d.value)} öre`;
+
+      const cLevel = document.createElement("div");
+      const meter = document.createElement("div");
+      meter.className="meter";
+      const fill = document.createElement("div");
+      fill.className="fill";
+      const pct = (d.value - vMin) / (vMax - vMin || 1);
+      fill.style.width = Math.round(pct*100) + "%";
+      fill.style.background = (d.level==="green") ? "var(--green)" : (d.level==="yellow") ? "var(--yellow)" : "var(--red)";
+      meter.appendChild(fill);
+
+      cLevel.appendChild(meter);
+
+      row.appendChild(cTime);
+      row.appendChild(cPrice);
+      row.appendChild(cLevel);
+      listEl.appendChild(row);
+    }
+  }
+
+  function stampDate(isToday){
+    const fmt = new Intl.DateTimeFormat('sv-SE',{weekday:'short',day:'2-digit',month:'short'});
+    stamp.textContent = (isToday ? "Idag " : "Imorgon ") + fmt.format(isToday ? today : tomorrow);
+  }
+
+  function render(){
+    const rows = currentDay==="today" ? rowsToday : rowsTomorrow;
+    if(!rows || !Array.isArray(rows) || rows.length===0){
+      chart.innerHTML="";
+      listEl.innerHTML="";
+      stamp.textContent = "Ingen data";
+      return;
+    }
+    const series = toSeries(rows);
+    computeLevels(series);
+    renderStats(series);
+    stampDate(currentDay==="today");
+    if(currentMode==="chart"){
+      chart.style.display="block";
+      listEl.style.display="none";
+      drawChart(series);
+    }else{
+      chart.style.display="none";
+      listEl.style.display="flex";
+      drawList(series);
+    }
+  }
+
+  function activateBtns(){
+    function setActive(btn, on){ btn.classList.toggle("active", on); }
+    setActive(btnToday, currentDay==="today");
+    setActive(btnTomorrow, currentDay==="tomorrow");
+    setActive(btnChart, currentMode==="chart");
+    setActive(btnList, currentMode==="list");
   }
 
   async function init(){
-    err.style.display="none";
-    try { dataToday = await fetchJson(URL_TODAY); } catch(e){ dataToday = []; }
-    try { dataTomorrow = await fetchJson(URL_TOMORROW); } catch(e){ dataTomorrow = null; }
+    try{ rowsToday = await fetchJson(URL_TODAY); }catch{ rowsToday=[]; }
+    try{ rowsTomorrow = await fetchJson(URL_TOMORROW); }catch{ rowsTomorrow=null; }
 
-    if (Array.isArray(dataToday) && dataToday.length) {
-      draw(toSeries(dataToday));
-      stamp.textContent = "Idag " + dtFmt(today);
-    } else {
-      showError("Ingen data för idag. Testa ladda om eller se att Actions skapade /data/today.json.");
+    // Disable Imorgon if empty
+    if(!rowsTomorrow || !rowsTomorrow.length){
+      btnTomorrow.disabled = true;
+      btnTomorrow.title = "Imorgon-data ej publicerad ännu";
     }
 
-    if (Array.isArray(dataTomorrow) && dataTomorrow.length) {
-      const tg = document.getElementById("dayToggle");
-      tg.style.display = "flex";
-      tg.onclick = ev => {
-        if (ev.target.tagName === "BUTTON") {
-          tg.querySelectorAll("button").forEach(b=>b.classList.remove("active"));
-          ev.target.classList.add("active");
-          if (ev.target.dataset.day === "tomorrow") {
-            draw(toSeries(dataTomorrow)); stamp.textContent = "Imorgon " + dtFmt(tomorrow);
-          } else {
-            draw(toSeries(dataToday));    stamp.textContent = "Idag " + dtFmt(today);
-          }
-        }
-      };
-    }
+    render();
   }
 
+  // button handlers
+  btnToday.onclick = ()=>{ currentDay="today"; activateBtns(); render(); };
+  btnTomorrow.onclick = ()=>{ currentDay="tomorrow"; activateBtns(); render(); };
+  btnChart.onclick = ()=>{ currentMode="chart"; activateBtns(); render(); };
+  btnList.onclick  = ()=>{ currentMode="list";  activateBtns(); render(); };
+
   init();
+  // Refresh periodically (if DAKboard stays open)
   setInterval(init, 30*60*1000);
 })();
 </script>
