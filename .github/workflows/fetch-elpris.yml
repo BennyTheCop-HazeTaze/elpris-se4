@@ -2,8 +2,12 @@ name: Fetch elpriser (SE4)
 
 on:
   schedule:
-    - cron: "*/30 * * * *"   # kör var 30:e minut
-  workflow_dispatch:         # så du kan köra manuellt vid behov
+    - cron: "*/30 * * * *"   # var 30:e minut
+  workflow_dispatch:
+
+# Viktigt: ge token skrivbehörighet
+permissions:
+  contents: write
 
 jobs:
   fetch:
@@ -11,8 +15,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: true   # använd GITHUB_TOKEN för push
 
       - name: Hämta elpris-data (SE4) och spara i /data
+        shell: bash
         run: |
           set -e
           mkdir -p data
@@ -24,14 +31,15 @@ jobs:
           # Dagens priser
           curl -fsSL "https://www.elprisetjustnu.se/api/v1/prices/${TODAY_PATH}_SE4.json" -o data/today.json
 
-          # Morgondagens priser (kan saknas före ~13:15, då hoppar vi över)
+          # Morgondagens priser (kan saknas före ~13:15)
           if curl -fsSL "https://www.elprisetjustnu.se/api/v1/prices/${TOMORROW_PATH}_SE4.json" -o data/tomorrow.json ; then
             echo "Imorgon-data hämtad"
           else
-            echo "Imorgon-data ej tillgänglig ännu – behåller ev. tidigare fil om den finns."
+            echo "Imorgon-data ej tillgänglig ännu – rör inte ev. befintlig fil."
           fi
 
       - name: Commit & push om något ändrats
+        shell: bash
         run: |
           if [ -n "$(git status --porcelain)" ]; then
             git config user.name "github-actions[bot]"
@@ -40,5 +48,5 @@ jobs:
             git commit -m "Update elpriser data"
             git push
           else
-            echo "Inga ändringar"
+            echo "Inga ändringar att committa"
           fi
