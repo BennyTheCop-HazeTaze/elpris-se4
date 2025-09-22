@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="sv">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Elpris SE4 – stapelgraf</title>
+<style>
+  html,body{height:100%;margin:0;background:#0b0e12;color:#e8edf2;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+  #wrap{display:flex;flex-direction:column;height:100%;padding:12px;box-sizing:border-box}
+  .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .title{font-weight:600;font-size:18px;letter-spacing:.2px}
+  .meta{opacity:.8;font-size:13px}
+  .toggle{margin-left:auto;display:flex;gap:6px}
+  .toggle button{background:#1a2230;border:1px solid #2b3547;color:#c9d7e6;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer}
+  .toggle button.active{background:#2e3a52;color:white;border-color:#3d4c6a}
+  .stats{display:flex;gap:14px;font-size:13px;opacity:.9;flex-wrap:wrap}
+  .chartWrap{position:relative;flex:1;min-height:260px;height:100%;margin-top:8px}
+  svg{width:100%;height:100%}
+  .bar{fill:#7fb3ff;opacity:.9}
+  .bar.now{fill:#ffd166}
+  .grid line{stroke:#253044;stroke-width:1}
+  .yLabel{fill:#a9b8cc;font-size:11px}
+  .xLabel{fill:#95a7bd;font-size:10px}
+  .hint{font-size:11px;opacity:.7;margin-top:4px}
+  .badge{background:#1a2230;border:1px solid #2b3547;border-radius:8px;padding:2px 8px}
+  .src{display:flex;align-items:center;gap:6px;margin-top:6px;opacity:.8;font-size:11px}
+  .src img{height:18px}
+</style>
+
+<div id="wrap">
+  <div class="row">
+    <div class="title">Elpris SE4 – stapelgraf</div>
+    <div class="toggle" id="dayToggle" style="display:none">
+      <button data-day="today" class="active">Idag</button>
+      <button data-day="tomorrow">Imorgon</button>
+    </div>
+  </div>
+  <div class="row" style="margin-top:2px">
+    <div class="stats">
+      <span id="statRange" class="badge">–</span>
+      <span id="statAvg"   class="badge">–</span>
+      <span id="statLow"   class="badge">–</span>
+      <span id="statHigh"  class="badge">–</span>
+    </div>
+    <div class="meta" id="stamp"></div>
+  </div>
+
+  <div class="chartWrap"><svg id="chart" viewBox="0 0 1000 420" preserveAspectRatio="none" aria-label="Elprisgraf"></svg></div>
+  <div class="hint">Öre/kWh. Exkl. skatter/påslag. Nuvarande period markeras gult.</div>
+  <div class="src">
+    <a href="https://www.elprisetjustnu.se" target="_blank" rel="noreferrer">
+      <img alt="Källa: elprisetjustnu.se" src="https://i.bnfcl.io/hva-koster-strommen/elpriser-tillhandahalls-av-elprisetjustnu_ttNExOIU_.png">
+    </a>
+    <span>Elpriser tillhandahålls av elprisetjustnu.se</span>
+  </div>
+</div>
+
+<script>
+(()=> {
+  const ZONE = "SE4";
+  const TZ   = "Europe/Stockholm";
+  const $ = s => document.querySelector(s);
+  const fmt = n => new Intl.NumberFormat('sv-SE',{maximumFractionDigits:0}).format(n);
+  const dtFmt = d => new Intl.DateTimeFormat('sv-SE',{weekday:'short',day:'2-digit',month:'short'}).format(d);
+
+  const chart=$("#chart"), statRange=$("#statRange"), statAvg=$("#statAvg"),
+        statLow=$("#statLow"), statHigh=$("#statHigh"), stamp=$("#stamp"),
+        toggle=$("#dayToggle");
+
+  const local = d => new Date(d.toLocaleString('en-CA',{timeZone:TZ}));
+  const today = local(new Date());
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
+
+  const buildURL = d => {
+    const y=d.getFullYear(), mm=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
+    return `https://www.elprisetjustnu.se/api/v1/prices/${y}/${mm}-${dd}_${ZONE}.json`;
+  };
+
+  let dataToday=null, dataTomorrow=null, showing="today";
+
+  const fetchJson = async u => (await fetch(u,{cache:'no-store'})).json();
+  const toSeries = rows => rows.map(r=>{
+    const ts = new Date(r.time_start);
+    const valueOre = r.SEK_per_kWh*100;
+    const label = ts.toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit',timeZone:TZ});
+    return {ts,label,value:valueOre};
+  });
+
+  function draw(series){
+    const W=1000,H=420,padL=46,padR=12,padT=18,padB=40;
+    chart.setAttribute("viewBox",`0 0 ${W} ${H}`); chart.innerHTML="";
+    const values = series.map(d=>d.value);
+    const vMin = Math.min(...values), vMax = Math.max(...values);
+    const niceMax = Math.ceil(vMax/10)*10, niceMin = Math.floor(Math.min(vMin,0)/10)*10;
+    const plotW=W-padL-padR, plotH=H-padT-padB, n=series.length, gap=2;
+    const barW=Math.max((plotW-(n-1)*gap)/n,2);
+    const yScale=v=> padT+(1-(v-niceMin)/(niceMax-niceMin))*plotH;
+    const xAt=i=> padL+i*(barW+gap);
+
+    const gGrid = document.createElementNS("http://www.w3.org/2000/svg","g");
+    gGrid.setAttribute("class","grid");
+    const ticks=5;
+    for(let i=0;i<=ticks;i++){
+      const v=niceMin+i*(niceMax-niceMin)/ticks, y=yScale(v);
+      const line=document.createElementNS("http://www.w3.org/2000/svg","line");
+      line.setAttribute("x1",padL); line.setAttribute("x2",W-padR);
+      line.setAttribute("y1",y); line.setAttribute("y2",y); gGrid.appendChild(line);
+      const t=document.createElementNS("http://www.w3.org/2000/svg","text");
+      t.setAttribute("x",padL-8); t.setAttribute("y",y+4); t.setAttribute("text-anchor","end"); t.setAttribute("class","yLabel");
+      t.textContent=fmt(v); gGrid.appendChild(t);
+    }
+    chart.appendChild(gGrid);
+
+    const nowLocal = local(new Date());
+    const round15 = d=>{const t=new Date(d); t.setMinutes(Math.floor(t.getMinutes()/15)*15,0,0); return t;};
+    const refNow = round15(nowLocal);
+
+    for(let i=0;i<n;i++){
+      const d=series[i], x=xAt(i), y=yScale(d.value), h=Math.max(1,(padT+plotH)-y);
+      const rect=document.createElementNS("http://www.w3.org/2000/svg","rect");
+      rect.setAttribute("x",x); rect.setAttribute("y",y); rect.setAttribute("width",barW); rect.setAttribute("height",h);
+      rect.setAttribute("class","bar");
+      const same=(a,b)=>a.getFullYear()==b.getFullYear()&&a.getMonth()==b.getMonth()&&a.getDate()==b.getDate()&&a.getHours()==b.getHours()&&a.getMinutes()==b.getMinutes();
+      if(same(d.ts,refNow)) rect.setAttribute("class","bar now");
+      chart.appendChild(rect);
+
+      const labelEach = (n===24) ? true : (i%4===0);
+      if(labelEach){
+        const t=document.createElementNS("http://www.w3.org/2000/svg","text");
+        t.setAttribute("x",x+barW/2); t.setAttribute("y",H-18); t.setAttribute("text-anchor","middle"); t.setAttribute("class","xLabel");
+        t.textContent=d.label; chart.appendChild(t);
+      }
+    }
+    const avg = values.reduce((a,b)=>a+b,0)/values.length;
+    const lo=Math.min(...values), hi=Math.max(...values), iLo=values.indexOf(lo), iHi=values.indexOf(hi);
+    statRange.textContent=`Intervall: ${fmt(niceMin)}–${fmt(niceMax)} öre/kWh`;
+    statAvg.textContent=`Medel: ${fmt(avg)} öre/kWh`;
+    statLow.textContent=`Lägst: ${fmt(lo)} öre/kWh (${series[iLo].label})`;
+    statHigh.textContent=`Högst: ${fmt(hi)} öre/kWh (${series[iHi].label})`;
+  }
+
+  function render(which){
+    const rows = (which==="today"?dataToday:dataTomorrow);
+    if(!rows) return;
+    draw(toSeries(rows));
+    stamp.textContent = (which==="today"?`Idag ${dtFmt(today)}`:`Imorgon ${dtFmt(tomorrow)}`);
+    toggle.querySelectorAll("button").forEach(b=>b.classList.toggle("active", b.dataset.day===which));
+  }
+
+  async function init(){
+    try{ dataToday = await fetchJson(buildURL(today)); }catch(e){ console.error(e); }
+    try{ dataTomorrow = await fetchJson(buildURL(tomorrow)); }catch(e){ dataTomorrow=null; }
+    if(dataToday) render("today");
+    if(dataTomorrow){
+      toggle.style.display="flex";
+      toggle.onclick = ev => { if(ev.target.tagName==="BUTTON") render(ev.target.dataset.day); };
+    }
+  }
+
+  init();
+  setInterval(init, 30*60*1000);
+})();
+</script>
+</html>
