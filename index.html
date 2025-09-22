@@ -7,144 +7,145 @@
   :root{
     --bg: transparent;
     --fg: #e8edf2;
-    --muted: #a9b8cc;
+    --muted: #cfe0f4;
     --panel: rgba(16,22,31,0.0);
-    --bar: #7fb3ff;
-    --bar-now: #ffd166;
+    --grid: #253044;
     --green: #33b566;
     --yellow:#eacb39;
     --red:   #e05555;
-    --grid: #253044;
+    --now:   #ffd166;
   }
   html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
-  #wrap{display:flex;flex-direction:column;height:100%;padding:12px;box-sizing:border-box;background:var(--panel)}
-  .row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-  .title{font-weight:700;font-size:20px;letter-spacing:.2px}
-  .meta{opacity:.95;font-size:14px}
-  .group{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap}
-  .btn{
-    background:#1a2230;border:1px solid #2b3547;color:var(--fg);
-    border-radius:12px;padding:10px 16px;font-size:14px;cursor:pointer;user-select:none
-  }
-  .btn.active{background:#2e3a52;color:#fff;border-color:#3d4c6a}
-  .stats{display:flex;gap:14px;font-size:14px;opacity:.95;flex-wrap:wrap}
-  .badge{background:#1a2230;border:1px solid #2b3547;border-radius:10px;padding:4px 10px}
-  .panel{position:relative;flex:1;min-height:260px;height:100%;margin-top:10px}
-
-  /* Chart */
+  #wrap{position:relative;display:flex;flex-direction:column;height:100%;padding:0;box-sizing:border-box;background:var(--panel)}
+  /* panel = endast graf/lista – all övrig text ligger i footer */
+  .panel{position:relative;flex:1;min-height:260px;height:100%}
   svg{width:100%;height:100%}
   .grid line{stroke:var(--grid);stroke-width:1}
-  .yLabel{fill:#cfe0f4;font-size:14px}
-  .xLabel{fill:#cfe0f4;font-size:13px}
-  .bar{fill:var(--bar);opacity:.95}
-  .bar.now{fill:var(--bar-now);filter:drop-shadow(0 0 6px rgba(255,209,102,.5))}
-  /* rounded tops for bars */
-  .bar{rx:6; ry:6}
+  .yLabel{fill:var(--muted);font-size:16px}  /* större */
+  .xLabel{fill:var(--muted);font-size:15px}  /* större */
+  .bar{opacity:.95;rx:7;ry:7}
+  .bar.now{fill:var(--now);filter:drop-shadow(0 0 6px rgba(255,209,102,.5))}
+  .barLabel{
+    fill:#ffffff; font-size:18px; font-weight:700;
+    text-anchor:middle; dominant-baseline:middle;
+    paint-order:stroke; stroke:#000; stroke-width:3px; stroke-opacity:.35;
+  }
 
   /* List view */
-  .list{display:flex;flex-direction:column;gap:8px}
+  .list{display:flex;flex-direction:column;gap:8px;padding:8px 12px 88px}
   .hdr,.rowItem{
-    display:grid;grid-template-columns:120px 130px 1fr;gap:12px;align-items:center;
-    padding:10px 12px;border:1px solid rgba(60,75,95,.35);border-radius:12px;background:rgba(24,31,44,0.25)
+    display:grid;grid-template-columns:140px 150px 1fr;gap:12px;align-items:center;
+    padding:12px 12px;border:1px solid rgba(60,75,95,.35);border-radius:12px;background:rgba(24,31,44,0.25)
   }
-  .hdr{font-weight:600;background:rgba(24,31,44,0.35)}
-  .cell-time{font-variant-numeric:tabular-nums}
-  .cell-price{font-variant-numeric:tabular-nums}
-  .meter{
-    position:relative;height:12px;border-radius:999px;background:rgba(255,255,255,0.08);overflow:hidden
-  }
+  .hdr{font-weight:700;background:rgba(24,31,44,0.35)}
+  .cell-time,.cell-price{font-variant-numeric:tabular-nums;font-size:16px}
+  .meter{position:relative;height:14px;border-radius:999px;background:rgba(255,255,255,0.08);overflow:hidden}
   .meter > .fill{height:100%;border-radius:999px}
-  .tag{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.15);opacity:.9}
-  .nowRow{outline:2px solid var(--bar-now); box-shadow:0 0 10px rgba(255,209,102,.4) inset}
-  .lvlGreen{background:rgba(51,181,102,.15); border-color:rgba(51,181,102,.35)}
-  .lvlYellow{background:rgba(234,203,57,.12); border-color:rgba(234,203,57,.30)}
-  .lvlRed{background:rgba(224,85,85,.12); border-color:rgba(224,85,85,.30)}
+  .nowRow{outline:2px solid var(--now); box-shadow:0 0 10px rgba(255,209,102,.4) inset}
+  .lvlGreen{background:rgba(51,181,102,.12); border-color:rgba(51,181,102,.30)}
+  .lvlYellow{background:rgba(234,203,57,.10); border-color:rgba(234,203,57,.28)}
+  .lvlRed{background:rgba(224,85,85,.10); border-color:rgba(224,85,85,.28)}
+
+  /* Footer (allt text/knappar i botten) */
+  .footer{
+    position:absolute; left:0; right:0; bottom:0;
+    display:flex; flex-wrap:wrap; align-items:center; gap:12px;
+    padding:10px 12px;
+    background:linear-gradient(to top, rgba(10,14,20,.75), rgba(10,14,20,.0));
+    pointer-events:auto;
+  }
+  .title{font-weight:800;font-size:20px;letter-spacing:.2px;margin-right:8px}
+  .stats{display:flex;gap:10px;flex-wrap:wrap}
+  .badge{background:#1a2230;border:1px solid #2b3547;border-radius:10px;padding:6px 10px;font-size:14px}
+  .meta{opacity:.95;font-size:15px;margin-left:auto;margin-right:8px}
+  .group{display:flex;gap:10px}
+  .btn{
+    background:#1a2230;border:1px solid #2b3547;color:var(--fg);
+    border-radius:12px;padding:10px 16px;font-size:15px;cursor:pointer;user-select:none
+  }
+  .btn.active{background:#2e3a52;color:#fff;border-color:#3d4c6a}
 </style>
 
 <div id="wrap">
-  <div class="row">
-    <div class="title">Elpris SE4 – graf & lista (inkl. moms)</div>
-    <div class="group">
-      <button class="btn active" data-day="today" id="btnToday">Idag</button>
-      <button class="btn" data-day="tomorrow" id="btnTomorrow">Imorgon</button>
-      <button class="btn active" data-mode="chart" id="btnChart">Graf</button>
-      <button class="btn" data-mode="list" id="btnList">Lista</button>
-    </div>
-  </div>
-
-  <div class="row" style="margin-top:4px">
-    <div class="stats">
-      <span id="statRange" class="badge">–</span>
-      <span id="statAvg"   class="badge">–</span>
-      <span id="statLow"   class="badge">–</span>
-      <span id="statHigh"  class="badge">–</span>
-    </div>
-    <div class="meta" id="stamp"></div>
-  </div>
-
-  <div class="panel" id="panel">
-    <svg id="chart" viewBox="0 0 1000 420" preserveAspectRatio="none" aria-label="Elprisgraf"></svg>
+  <div class="panel">
+    <svg id="chart" viewBox="0 0 1000 480" preserveAspectRatio="none" aria-label="Elprisgraf"></svg>
     <div id="list" class="list" style="display:none"></div>
+
+    <!-- Footer längst ner -->
+    <div class="footer">
+      <div class="title">Elpris SE4</div>
+      <div class="stats">
+        <span id="statRange" class="badge">–</span>
+        <span id="statAvg"   class="badge">–</span>
+        <span id="statLow"   class="badge">–</span>
+        <span id="statHigh"  class="badge">–</span>
+      </div>
+      <div class="meta" id="stamp">–</div>
+      <div class="group">
+        <button class="btn active" data-day="today" id="btnToday">Idag</button>
+        <button class="btn" data-day="tomorrow" id="btnTomorrow">Imorgon</button>
+        <button class="btn active" data-mode="chart" id="btnChart">Graf</button>
+        <button class="btn" data-mode="list" id="btnList">Lista</button>
+      </div>
+    </div>
   </div>
 </div>
 
 <script>
 (()=> {
   const TZ = "Europe/Stockholm";
-  const VAT = 1.25;    // 25% moms
+  const VAT = 1.25;                  // 25% moms
   const $ = s => document.querySelector(s);
 
-  const chart=$("#chart"), listEl=$("#list"), panel=$("#panel");
+  const chart=$("#chart"), listEl=$("#list");
   const statRange=$("#statRange"), statAvg=$("#statAvg"), statLow=$("#statLow"), statHigh=$("#statHigh"), stamp=$("#stamp");
   const btnToday=$("#btnToday"), btnTomorrow=$("#btnTomorrow"), btnChart=$("#btnChart"), btnList=$("#btnList");
 
   const today = new Date();
   const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
 
-  // read local files produced by the Action (cache-busted)
   const bust = () => `?v=${Date.now()}`;
   const URL_TODAY    = "./data/today.json"    + bust();
   const URL_TOMORROW = "./data/tomorrow.json" + bust();
 
   let rowsToday=null, rowsTomorrow=null, currentDay="today", currentMode="chart";
 
-  async function fetchJson(u){
-    const r = await fetch(u,{cache:'no-store'});
-    if(!r.ok) throw new Error(`HTTP ${r.status}`);
-    return r.json();
-  }
+  async function fetchJson(u){ const r=await fetch(u,{cache:'no-store'}); if(!r.ok) throw new Error(r.status); return r.json(); }
 
   function toSeries(rows){
     return rows.map(r=>{
       const ts = new Date(r.time_start);
       const te = new Date(r.time_end);
-      const value = (r.SEK_per_kWh||0)*100*VAT; // öre inkl. moms
-      const labelStart = ts.toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit',timeZone:TZ});
-      const labelEnd   = te.toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit',timeZone:TZ});
-      const slotMins = Math.round((te - ts)/60000);
-      return {ts, te, value, label: labelStart, labelRange: `${labelStart} – ${labelEnd}`, minutes: slotMins};
+      const value = (r.SEK_per_kWh||0)*100*VAT; // öre inkl moms
+      const start = ts.toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit',timeZone:TZ});
+      const end   = te.toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit',timeZone:TZ});
+      return {ts,te,value,label:start,labelRange:`${start} – ${end}`};
     });
   }
 
   function computeLevels(series){
-    // färga enligt dag-fördelning: 0–33% grön, 34–66% gul, 67–100% röd
     const values = series.map(d=>d.value).slice().sort((a,b)=>a-b);
-    const idx33 = Math.floor((values.length-1)*0.33);
-    const idx66 = Math.floor((values.length-1)*0.66);
-    const thr33 = values[idx33];
-    const thr66 = values[idx66];
+    const thr33 = values[Math.floor((values.length-1)*0.33)];
+    const thr66 = values[Math.floor((values.length-1)*0.66)];
     series.forEach(d=>{
-      if (d.value <= thr33) d.level="green";
-      else if (d.value <= thr66) d.level="yellow";
-      else d.level="red";
+      d.level = (d.value<=thr33) ? "green" : (d.value<=thr66) ? "yellow" : "red";
     });
-    return {thr33,thr66};
   }
+
+  function nowRounded(){
+    const n = new Date(new Date().toLocaleString('en-CA',{timeZone:TZ}));
+    n.setSeconds(0,0);
+    n.setMinutes(Math.floor(n.getMinutes()/15)*15);
+    return n;
+  }
+
+  const nf0 = new Intl.NumberFormat('sv-SE',{maximumFractionDigits:0});
+  function fmt0(n){ return nf0.format(n); }
+  function fmt10(n){ return nf0.format(Math.round(n/10)*10); }
 
   function renderStats(series){
     const vals = series.map(d=>d.value);
-    const lo = Math.min(...vals), hi = Math.max(...vals);
-    const avg = vals.reduce((a,b)=>a+b,0)/vals.length;
+    const lo = Math.min(...vals), hi = Math.max(...vals), avg = vals.reduce((a,b)=>a+b,0)/vals.length;
     const iLo = vals.indexOf(lo), iHi = vals.indexOf(hi);
     statRange.textContent = `Intervall: ${fmt10(lo)}–${fmt10(hi)} öre/kWh`;
     statAvg.textContent   = `Medel: ${fmt0(avg)} öre/kWh`;
@@ -152,21 +153,8 @@
     statHigh.textContent  = `Högst: ${fmt0(hi)} öre/kWh (${series[iHi].label})`;
   }
 
-  const nf0 = new Intl.NumberFormat('sv-SE',{maximumFractionDigits:0});
-  function fmt0(n){ return nf0.format(n); }
-  function fmt10(n){ return nf0.format(Math.round(n/10)*10); }
-
-  function nowRounded(){
-    const n = new Date(new Date().toLocaleString('en-CA',{timeZone:TZ}));
-    n.setSeconds(0,0);
-    const m = n.getMinutes();
-    // round down to 15 for quarter compatibility
-    n.setMinutes(Math.floor(m/15)*15);
-    return n;
-  }
-
   function drawChart(series){
-    const W=1000,H=420,padL=50,padR=12,padT=18,padB=44;
+    const W=1000,H=480,padL=16,padR=56,padT=8,padB=86; // Y-etiketter till höger ⇒ större padR, bottom för footer
     chart.setAttribute("viewBox",`0 0 ${W} ${H}`); chart.innerHTML="";
     const vals = series.map(d=>d.value);
     const vMin = Math.min(...vals), vMax = Math.max(...vals);
@@ -177,9 +165,8 @@
     const yScale=v=> padT+(1-(v-niceMin)/(niceMax-niceMin))*plotH;
     const xAt=i=> padL+i*(barW+gap);
 
-    // grid
-    const gGrid = document.createElementNS("http://www.w3.org/2000/svg","g");
-    gGrid.setAttribute("class","grid");
+    // horisontella gridlinjer + Y-etiketter på HÖGER sida
+    const gGrid = document.createElementNS("http://www.w3.org/2000/svg","g"); gGrid.setAttribute("class","grid");
     const ticks=5;
     for(let i=0;i<=ticks;i++){
       const v=niceMin+i*(niceMax-niceMin)/ticks, y=yScale(v);
@@ -187,93 +174,82 @@
       line.setAttribute("x1",padL); line.setAttribute("x2",W-padR);
       line.setAttribute("y1",y); line.setAttribute("y2",y); gGrid.appendChild(line);
       const t=document.createElementNS("http://www.w3.org/2000/svg","text");
-      t.setAttribute("x",padL-8); t.setAttribute("y",y+5);
-      t.setAttribute("text-anchor","end"); t.setAttribute("class","yLabel"); t.textContent=fmt0(v);
+      t.setAttribute("x",W-padR+8); t.setAttribute("y",y+5);
+      t.setAttribute("text-anchor","start"); t.setAttribute("class","yLabel"); t.textContent=fmt0(v);
       gGrid.appendChild(t);
     }
     chart.appendChild(gGrid);
 
     const nowRef = nowRounded();
+
     for(let i=0;i<n;i++){
       const d=series[i], x=xAt(i), y=yScale(d.value), h=Math.max(1,(padT+plotH)-y);
       const rect=document.createElementNS("http://www.w3.org/2000/svg","rect");
       rect.setAttribute("x",x); rect.setAttribute("y",y);
       rect.setAttribute("width",barW); rect.setAttribute("height",h);
-      rect.setAttribute("class","bar");
-      rect.setAttribute("rx","6"); rect.setAttribute("ry","6");
-
-      // color by level
+      rect.setAttribute("rx","7"); rect.setAttribute("ry","7");
+      // färg efter nivå
       if(d.level==="green") rect.style.fill="var(--green)";
       else if(d.level==="yellow") rect.style.fill="var(--yellow)";
       else rect.style.fill="var(--red)";
-
+      // markera nu
       const same=(a,b)=>a.getFullYear()==b.getFullYear()&&a.getMonth()==b.getMonth()&&a.getDate()==b.getDate()&&a.getHours()==b.getHours()&&a.getMinutes()==b.getMinutes();
-      if(same(d.ts, nowRef)) rect.setAttribute("class","bar now");
-
+      if(same(d.ts, nowRef)) rect.setAttribute("class","bar now"); else rect.setAttribute("class","bar");
       chart.appendChild(rect);
 
+      // tidetikett (glesare vid kvartstaxa)
       const showLabel = (n===24) ? true : (i%4===0);
       if(showLabel){
         const t=document.createElementNS("http://www.w3.org/2000/svg","text");
-        t.setAttribute("x", x + barW/2); t.setAttribute("y", H-16);
+        t.setAttribute("x", x + barW/2); t.setAttribute("y", H-20);
         t.setAttribute("text-anchor","middle"); t.setAttribute("class","xLabel");
         t.textContent = d.label;
         chart.appendChild(t);
+      }
+
+      // Inprintad pristext vertikalt i stapeln om >= 30 öre
+      if (d.value >= 30 && h > 30) {
+        const lbl=document.createElementNS("http://www.w3.org/2000/svg","text");
+        lbl.setAttribute("class","barLabel");
+        const cx = x + barW/2;
+        const cy = y + h/2;
+        lbl.setAttribute("transform", `rotate(-90 ${cx} ${cy})`);
+        lbl.setAttribute("x", cx); lbl.setAttribute("y", cy);
+        lbl.textContent = fmt0(d.value);
+        chart.appendChild(lbl);
       }
     }
   }
 
   function drawList(series){
     listEl.innerHTML="";
-
-    // header
-    const hdr = document.createElement("div");
-    hdr.className="hdr";
+    const hdr = document.createElement("div"); hdr.className="hdr";
     hdr.innerHTML = `<div>Timme</div><div>Pris per kWh</div><div>Prisnivå</div>`;
     listEl.appendChild(hdr);
 
     const nowRef = nowRounded();
-
-    // length for percent fill scale
-    const vals = series.map(d=>d.value);
-    const vMin = Math.min(...vals), vMax = Math.max(...vals);
+    const vals = series.map(d=>d.value); const vMin=Math.min(...vals), vMax=Math.max(...vals);
 
     for(const d of series){
-      const row = document.createElement("div");
-      row.className="rowItem";
-      // level class for subtle background
+      const row=document.createElement("div"); row.className="rowItem";
       if(d.level==="green") row.classList.add("lvlGreen");
       else if(d.level==="yellow") row.classList.add("lvlYellow");
       else row.classList.add("lvlRed");
 
-      // highlight current slot
       const same=(a,b)=>a.getFullYear()==b.getFullYear()&&a.getMonth()==b.getMonth()&&a.getDate()==b.getDate()&&a.getHours()==b.getHours()&&a.getMinutes()==b.getMinutes();
       if(same(d.ts, nowRef)) row.classList.add("nowRow");
 
-      // time / price cells
-      const cTime = document.createElement("div");
-      cTime.className="cell-time";
-      cTime.textContent = d.labelRange;
+      const cTime=document.createElement("div"); cTime.className="cell-time"; cTime.textContent=d.labelRange;
+      const cPrice=document.createElement("div"); cPrice.className="cell-price"; cPrice.textContent=`${fmt0(d.value)} öre`;
+      const cLevel=document.createElement("div");
+      const meter=document.createElement("div"); meter.className="meter";
+      const fill=document.createElement("div"); fill.className="fill";
+      const pct=(d.value - vMin)/(vMax - vMin || 1);
+      fill.style.width = Math.round(pct*100)+"%";
+      fill.style.background = (d.level==="green")?"var(--green)":(d.level==="yellow")?"var(--yellow)":"var(--red)";
+      meter.appendChild(fill); cLevel.appendChild(meter);
 
-      const cPrice = document.createElement("div");
-      cPrice.className="cell-price";
-      cPrice.textContent = `${fmt0(d.value)} öre`;
-
-      const cLevel = document.createElement("div");
-      const meter = document.createElement("div");
-      meter.className="meter";
-      const fill = document.createElement("div");
-      fill.className="fill";
-      const pct = (d.value - vMin) / (vMax - vMin || 1);
-      fill.style.width = Math.round(pct*100) + "%";
-      fill.style.background = (d.level==="green") ? "var(--green)" : (d.level==="yellow") ? "var(--yellow)" : "var(--red)";
-      meter.appendChild(fill);
-
-      cLevel.appendChild(meter);
-
-      row.appendChild(cTime);
-      row.appendChild(cPrice);
-      row.appendChild(cLevel);
+      row.appendChild(cTime); row.appendChild(cPrice); row.appendChild(cLevel);
       listEl.appendChild(row);
     }
   }
@@ -284,57 +260,37 @@
   }
 
   function render(){
-    const rows = currentDay==="today" ? rowsToday : rowsTomorrow;
-    if(!rows || !Array.isArray(rows) || rows.length===0){
-      chart.innerHTML="";
-      listEl.innerHTML="";
-      stamp.textContent = "Ingen data";
-      return;
-    }
+    const rows = (currentDay==="today") ? rowsToday : rowsTomorrow;
+    if(!rows || !rows.length){ chart.innerHTML=""; listEl.innerHTML=""; return; }
     const series = toSeries(rows);
     computeLevels(series);
     renderStats(series);
     stampDate(currentDay==="today");
-    if(currentMode==="chart"){
-      chart.style.display="block";
-      listEl.style.display="none";
-      drawChart(series);
-    }else{
-      chart.style.display="none";
-      listEl.style.display="flex";
-      drawList(series);
-    }
+
+    if(currentMode==="chart"){ chart.style.display="block"; listEl.style.display="none"; drawChart(series); }
+    else { chart.style.display="none"; listEl.style.display="flex"; drawList(series); }
   }
 
   function activateBtns(){
-    function setActive(btn, on){ btn.classList.toggle("active", on); }
-    setActive(btnToday, currentDay==="today");
-    setActive(btnTomorrow, currentDay==="tomorrow");
-    setActive(btnChart, currentMode==="chart");
-    setActive(btnList, currentMode==="list");
+    btnToday.classList.toggle("active", currentDay==="today");
+    btnTomorrow.classList.toggle("active", currentDay==="tomorrow");
+    btnChart.classList.toggle("active", currentMode==="chart");
+    btnList.classList.toggle("active", currentMode==="list");
   }
 
   async function init(){
     try{ rowsToday = await fetchJson(URL_TODAY); }catch{ rowsToday=[]; }
     try{ rowsTomorrow = await fetchJson(URL_TOMORROW); }catch{ rowsTomorrow=null; }
-
-    // Disable Imorgon if empty
-    if(!rowsTomorrow || !rowsTomorrow.length){
-      btnTomorrow.disabled = true;
-      btnTomorrow.title = "Imorgon-data ej publicerad ännu";
-    }
-
+    if(!rowsTomorrow || !rowsTomorrow.length){ btnTomorrow.disabled=true; btnTomorrow.title="Imorgon-data ej publicerad ännu"; }
     render();
   }
 
-  // button handlers
   btnToday.onclick = ()=>{ currentDay="today"; activateBtns(); render(); };
   btnTomorrow.onclick = ()=>{ currentDay="tomorrow"; activateBtns(); render(); };
   btnChart.onclick = ()=>{ currentMode="chart"; activateBtns(); render(); };
   btnList.onclick  = ()=>{ currentMode="list";  activateBtns(); render(); };
 
   init();
-  // Refresh periodically (if DAKboard stays open)
   setInterval(init, 30*60*1000);
 })();
 </script>
