@@ -27,7 +27,6 @@
   .nowDot{fill:var(--now);stroke:#000;stroke-width:calc(2px*var(--s));stroke-opacity:.35}
   .nowTag{fill:#fff;font-weight:800;text-anchor:middle;font-size:calc(14px*var(--s));
           paint-order:stroke;stroke:#000;stroke-width:calc(3px*var(--s));stroke-opacity:.35}
-  /* torn-siffror (smala) */
   .digit{
     fill:#fff; font-weight:700; text-anchor:middle;
     font-family:"Roboto Condensed","Arial Narrow","Segoe UI",system-ui;
@@ -85,7 +84,7 @@
   function toSeries(rows){
     return rows.map(r=>{
       const ts=new Date(r.time_start), te=new Date(r.time_end);
-      const value=(r.SEK_per_kWh||0)*100*VAT;  // öre inkl. moms
+      const value=(r.SEK_per_kWh||0)*100*VAT;
       const label=ts.toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit',timeZone:TZ});
       return {ts,te,value,label};
     });
@@ -125,7 +124,6 @@
     const vals=series.map(d=>d.value), vMin=Math.min(...vals), vMax=Math.max(...vals);
     const niceMax=Math.ceil(vMax/10)*10, niceMin=Math.floor(Math.min(vMin,0)/10)*10;
     const plotW=W-padL-padR, plotH=H-padT-padB;
-
     const n=series.length;
     const ideal=plotW/n;
     let gap=Math.max(0.5, Math.round(ideal*0.08));
@@ -135,7 +133,6 @@
     const yScale=v=>padT+(1-(v-niceMin)/(niceMax-niceMin))*plotH;
     const xAt=i=>padL+i*(barW+gap);
 
-    // Grid + Y labels
     const g=document.createElementNS("http://www.w3.org/2000/svg","g"); g.setAttribute("class","grid");
     for(let i=0;i<=5;i++){
       const val=niceMin+i*(niceMax-niceMin)/5, y=yScale(val);
@@ -149,11 +146,9 @@
     }
     chart.appendChild(g);
 
-    // Nu-slot via ts <= now < te
     const now = new Date();
     const idxNow = series.findIndex(d => now>=d.ts && now<d.te);
 
-    // Dimma vänstra sidan (gardin)
     if(idxNow>0){
       const leftW = xAt(idxNow) - padL;
       const shade=document.createElementNS("http://www.w3.org/2000/svg","rect");
@@ -163,7 +158,6 @@
       chart.appendChild(shade);
     }
 
-    // NU-linje + punkt + text (punkt och text lite högre)
     if(idxNow>=0){
       const d=series[idxNow];
       const x=xAt(idxNow)+barW/2; const y=yScale(d.value);
@@ -172,12 +166,12 @@
       nl.setAttribute("class","nowLine"); chart.appendChild(nl);
 
       const dot=document.createElementNS("http://www.w3.org/2000/svg","circle");
-      dot.setAttribute("cx",x); dot.setAttribute("cy",y - 6*s);          /* upp lite */
+      dot.setAttribute("cx",x); dot.setAttribute("cy",y - 6*s);
       dot.setAttribute("r",Math.max(4,6*s)); dot.setAttribute("class","nowDot"); chart.appendChild(dot);
 
       const tag=document.createElementNS("http://www.w3.org/2000/svg","text");
       tag.setAttribute("x",x);
-      tag.setAttribute("y",Math.max(padT+26*s, y - 18*s));               /* högre etikett */
+      tag.setAttribute("y",Math.max(padT+26*s, y - 18*s));
       tag.setAttribute("class","nowTag");
       tag.textContent=`Nu ${nf0.format(Math.round(d.value))} öre`; chart.appendChild(tag);
 
@@ -186,44 +180,40 @@
       liveNow.textContent="Just nu: –";
     }
 
-    // X-etiketter (heltimme vid kvartstaxa)
     const isQuarter = n>48;
     let every=1; if(barW<28) every=2; if(barW<20) every=3; if(barW<15) every=4;
 
-    // Siffror som VERTIKALT TORN i varje stapel
+    // ---- UPPIFRÅN OCH NED VERSION ----
     function drawStackedDigits(xCenter, yTop, height, value, minFont){
-      // ta bara heltal i öre, inga mellanslag
       let str = String(Math.round(value));
-      // om negativt värde: lägg '−' överst i tornet
       const neg = str[0]==='-' || str[0]==='−';
       if(neg) str = str.replace('-', '').replace('−','');
-
-      const digits = str.split('');                // t.ex. ['4','7']
+      const digits = str.split('');
       const neededLines = digits.length + (neg?1:0);
-      const maxFont = 12 * (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--s'))||1);
-      // beräkna font så att allt får plats
+      const s = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--s'))||1;
+      const maxFont = 12 * s;
       let font = Math.min(maxFont, Math.max(minFont, (height-6) / (neededLines*1.15)));
       if(!isFinite(font) || font<minFont) font=minFont;
-
-      const line = font*1.05;                      // radavstånd
-      let y = yTop + height - 4;                   // starta nära botten
-
-      // rita siffror nerifrån och upp
+      const line = font*1.05;
+      const bottom = yTop + height - 4;
+      const totalStack = digits.length * line;
+      const topStart = bottom - totalStack;
       for(let i=0;i<digits.length;i++){
+        const y = topStart + i*line;
         const t=document.createElementNS("http://www.w3.org/2000/svg","text");
         t.setAttribute("class","digit");
         t.setAttribute("x",xCenter);
-        t.setAttribute("y",y - i*line);
+        t.setAttribute("y",y);
         t.setAttribute("font-size",font);
         t.textContent=digits[i];
         chart.appendChild(t);
       }
-      // lägg negativ-symbolen överst vid behov
       if(neg){
+        const yMinus = topStart - line*0.9;
         const t=document.createElementNS("http://www.w3.org/2000/svg","text");
         t.setAttribute("class","digit");
         t.setAttribute("x",xCenter);
-        t.setAttribute("y",y - digits.length*line);
+        t.setAttribute("y",yMinus);
         t.setAttribute("font-size",font);
         t.textContent="−";
         chart.appendChild(t);
@@ -232,7 +222,6 @@
 
     for(let i=0;i<n;i++){
       const d=series[i], x=xAt(i), y=yScale(d.value), h=Math.max(1,(H-padB)-y);
-
       const r=document.createElementNS("http://www.w3.org/2000/svg","rect");
       r.setAttribute("x",x); r.setAttribute("y",y); r.setAttribute("width",barW); r.setAttribute("height",h);
       r.style.fill = d.value<0 ? "var(--blue)" :
@@ -240,10 +229,7 @@
                      d.level==="yellow" ? "var(--yellow)" : "var(--red)";
       if(i<idxNow) r.classList.add("bar","past"); else r.classList.add("bar");
       chart.appendChild(r);
-
-      // torn av siffror inifrån stapeln
       drawStackedDigits(x+barW/2, y, h, d.value, 8);
-
       const showX=(i%every===0) && (isQuarter ? (d.ts.getMinutes()===0) : true);
       if(showX){
         const t=document.createElementNS("http://www.w3.org/2000/svg","text");
