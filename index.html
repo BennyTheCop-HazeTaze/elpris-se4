@@ -10,10 +10,7 @@
   :root{
     --fg:#e8edf2; --muted:#cfe0f4; --grid:#263347;
     --now:#ffd166;
-    --green:#5fa878;   /* låg */
-    --yellow:#d8b44a;  /* mellan */
-    --red:#c06060;     /* hög */
-    --blue:#5aa7d6;    /* negativt */
+    --green:#5fa878;   --yellow:#d8b44a;  --red:#c06060;  --blue:#5aa7d6;
     --chip:#1a2230; --chip-b:#2b3547; --chip-a:#2e3a52;
     --s:1;
   }
@@ -25,18 +22,16 @@
   .yLabel{fill:var(--muted);font-size:calc(14px*var(--s))}
   .xLabel{fill:var(--muted);font-size:calc(13px*var(--s))}
   .bar{opacity:.95;rx:calc(7px*var(--s));ry:calc(7px*var(--s))}
-  .bar.past{opacity:.5} /* starkare dimning */
+  .bar.past{opacity:.5}
   .nowLine{stroke:var(--now);stroke-width:2.2;stroke-dasharray:4 3;opacity:.95}
   .nowDot{fill:var(--now);stroke:#000;stroke-width:calc(2px*var(--s));stroke-opacity:.35}
   .nowTag{fill:#fff;font-weight:800;text-anchor:middle;font-size:calc(14px*var(--s));
           paint-order:stroke;stroke:#000;stroke-width:calc(3px*var(--s));stroke-opacity:.35}
-  /* mindre/smalare siffror i varje stapel + lite spacing */
-  .val{
-    fill:#fff;font-weight:700;text-anchor:middle;
-    font-size:calc(10px*var(--s));
-    letter-spacing:0.6px;
+  /* torn-siffror (smala) */
+  .digit{
+    fill:#fff; font-weight:700; text-anchor:middle;
     font-family:"Roboto Condensed","Arial Narrow","Segoe UI",system-ui;
-    paint-order:stroke;stroke:#000;stroke-width:calc(3px*var(--s));stroke-opacity:.35;
+    paint-order:stroke; stroke:#000; stroke-width:calc(3px*var(--s)); stroke-opacity:.35;
   }
   .footer{display:flex;flex-wrap:wrap;align-items:center;gap:calc(8px*var(--s));padding:0 calc(8px*var(--s)) calc(4px*var(--s))}
   .title{font-weight:800;font-size:calc(18px*var(--s))}
@@ -90,7 +85,7 @@
   function toSeries(rows){
     return rows.map(r=>{
       const ts=new Date(r.time_start), te=new Date(r.time_end);
-      const value=(r.SEK_per_kWh||0)*100*VAT; // öre inkl. moms
+      const value=(r.SEK_per_kWh||0)*100*VAT;  // öre inkl. moms
       const label=ts.toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit',timeZone:TZ});
       return {ts,te,value,label};
     });
@@ -103,8 +98,6 @@
       else d.level=(d.value<=t33)?"green":(d.value<=t66)?"yellow":"red";
     });
   }
-  function nowInTZ(){ return new Date(); }
-
   const nf0=new Intl.NumberFormat('sv-SE',{maximumFractionDigits:0});
   const nf2=new Intl.NumberFormat('sv-SE',{minimumFractionDigits:2,maximumFractionDigits:2});
   const fmt0=n=>nf0.format(n), fmt10=n=>nf0.format(Math.round(n/10)*10);
@@ -142,7 +135,7 @@
     const yScale=v=>padT+(1-(v-niceMin)/(niceMax-niceMin))*plotH;
     const xAt=i=>padL+i*(barW+gap);
 
-    // Grid + Y-etiketter (höger)
+    // Grid + Y labels
     const g=document.createElementNS("http://www.w3.org/2000/svg","g"); g.setAttribute("class","grid");
     for(let i=0;i<=5;i++){
       const val=niceMin+i*(niceMax-niceMin)/5, y=yScale(val);
@@ -156,44 +149,89 @@
     }
     chart.appendChild(g);
 
-    const now=nowInTZ();
-    const idxNow=series.findIndex(d=> now>=d.ts && now<d.te);
+    // Nu-slot via ts <= now < te
+    const now = new Date();
+    const idxNow = series.findIndex(d => now>=d.ts && now<d.te);
 
-    // Dimma vänster sida lite extra (gardin)
+    // Dimma vänstra sidan (gardin)
     if(idxNow>0){
       const leftW = xAt(idxNow) - padL;
       const shade=document.createElementNS("http://www.w3.org/2000/svg","rect");
       shade.setAttribute("x",padL); shade.setAttribute("y",padT);
-      shade.setAttribute("width",leftW); shade.setAttribute("height",plotH);
-      shade.setAttribute("fill","#000"); shade.setAttribute("fill-opacity","0.18"); /* lite starkare dimning */
+      shade.setAttribute("width",leftW); shade.setAttribute("height",H-padT-padB);
+      shade.setAttribute("fill","#000"); shade.setAttribute("fill-opacity","0.18");
       chart.appendChild(shade);
     }
 
-    // NU-linje + prick + text + footer
+    // NU-linje + punkt + text (punkt och text lite högre)
     if(idxNow>=0){
       const d=series[idxNow];
       const x=xAt(idxNow)+barW/2; const y=yScale(d.value);
       const nl=document.createElementNS("http://www.w3.org/2000/svg","line");
-      nl.setAttribute("x1",x); nl.setAttribute("x2",x); nl.setAttribute("y1",padT); nl.setAttribute("y2",padT+plotH);
+      nl.setAttribute("x1",x); nl.setAttribute("x2",x); nl.setAttribute("y1",padT); nl.setAttribute("y2",H-padB);
       nl.setAttribute("class","nowLine"); chart.appendChild(nl);
+
       const dot=document.createElementNS("http://www.w3.org/2000/svg","circle");
-      dot.setAttribute("cx",x); dot.setAttribute("cy",y); dot.setAttribute("r",Math.max(4,6*s)); dot.setAttribute("class","nowDot"); chart.appendChild(dot);
+      dot.setAttribute("cx",x); dot.setAttribute("cy",y - 6*s);          /* upp lite */
+      dot.setAttribute("r",Math.max(4,6*s)); dot.setAttribute("class","nowDot"); chart.appendChild(dot);
+
       const tag=document.createElementNS("http://www.w3.org/2000/svg","text");
       tag.setAttribute("x",x);
-      tag.setAttribute("y",Math.max(padT+22*s, y - 14*s)); /* högre upp än tidigare */
+      tag.setAttribute("y",Math.max(padT+26*s, y - 18*s));               /* högre etikett */
       tag.setAttribute("class","nowTag");
-      tag.textContent=`Nu ${fmt0(d.value)} öre`; chart.appendChild(tag);
+      tag.textContent=`Nu ${nf0.format(Math.round(d.value))} öre`; chart.appendChild(tag);
+
       liveNow.textContent=`Just nu: ${nf2.format(d.value/100)} kr/kWh (${d.label})`;
     } else {
       liveNow.textContent="Just nu: –";
     }
 
-    // X-etiketter: var heltimme vid kvartstaxa
+    // X-etiketter (heltimme vid kvartstaxa)
     const isQuarter = n>48;
     let every=1; if(barW<28) every=2; if(barW<20) every=3; if(barW<15) every=4;
 
+    // Siffror som VERTIKALT TORN i varje stapel
+    function drawStackedDigits(xCenter, yTop, height, value, minFont){
+      // ta bara heltal i öre, inga mellanslag
+      let str = String(Math.round(value));
+      // om negativt värde: lägg '−' överst i tornet
+      const neg = str[0]==='-' || str[0]==='−';
+      if(neg) str = str.replace('-', '').replace('−','');
+
+      const digits = str.split('');                // t.ex. ['4','7']
+      const neededLines = digits.length + (neg?1:0);
+      const maxFont = 12 * (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--s'))||1);
+      // beräkna font så att allt får plats
+      let font = Math.min(maxFont, Math.max(minFont, (height-6) / (neededLines*1.15)));
+      if(!isFinite(font) || font<minFont) font=minFont;
+
+      const line = font*1.05;                      // radavstånd
+      let y = yTop + height - 4;                   // starta nära botten
+
+      // rita siffror nerifrån och upp
+      for(let i=0;i<digits.length;i++){
+        const t=document.createElementNS("http://www.w3.org/2000/svg","text");
+        t.setAttribute("class","digit");
+        t.setAttribute("x",xCenter);
+        t.setAttribute("y",y - i*line);
+        t.setAttribute("font-size",font);
+        t.textContent=digits[i];
+        chart.appendChild(t);
+      }
+      // lägg negativ-symbolen överst vid behov
+      if(neg){
+        const t=document.createElementNS("http://www.w3.org/2000/svg","text");
+        t.setAttribute("class","digit");
+        t.setAttribute("x",xCenter);
+        t.setAttribute("y",y - digits.length*line);
+        t.setAttribute("font-size",font);
+        t.textContent="−";
+        chart.appendChild(t);
+      }
+    }
+
     for(let i=0;i<n;i++){
-      const d=series[i], x=xAt(i), y=yScale(d.value), h=Math.max(1,(padT+plotH)-y);
+      const d=series[i], x=xAt(i), y=yScale(d.value), h=Math.max(1,(H-padB)-y);
 
       const r=document.createElementNS("http://www.w3.org/2000/svg","rect");
       r.setAttribute("x",x); r.setAttribute("y",y); r.setAttribute("width",barW); r.setAttribute("height",h);
@@ -203,14 +241,8 @@
       if(i<idxNow) r.classList.add("bar","past"); else r.classList.add("bar");
       chart.appendChild(r);
 
-      // siffra i varje stapel – liten, smal, roterad – flytta upp om stapeln är låg
-      const lbl=document.createElementNS("http://www.w3.org/2000/svg","text");
-      lbl.setAttribute("class","val");
-      const cy = (h>(18*s)) ? (y + Math.min(h-6, Math.max(12, h*0.52))) : (y - 5);
-      lbl.setAttribute("transform",`rotate(-90 ${x+barW/2} ${cy})`);
-      lbl.setAttribute("x",x+barW/2); lbl.setAttribute("y",cy);
-      lbl.textContent=fmt0(d.value);
-      chart.appendChild(lbl);
+      // torn av siffror inifrån stapeln
+      drawStackedDigits(x+barW/2, y, h, d.value, 8);
 
       const showX=(i%every===0) && (isQuarter ? (d.ts.getMinutes()===0) : true);
       if(showX){
@@ -225,14 +257,7 @@
   function renderAll(rows,isToday){
     const series=toSeries(rows);
     computeLevels(series);
-    // stats & header
-    const v=series.map(d=>d.value), lo=Math.min(...v), hi=Math.max(...v), avg=v.reduce((a,b)=>a+b,0)/v.length;
-    const iLo=v.indexOf(lo), iHi=v.indexOf(hi);
-    const tf=d=>d.ts.toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit',timeZone:TZ});
-    statRange.textContent=`Intervall: ${fmt10(lo)}–${fmt10(hi)} öre/kWh`;
-    statAvg.textContent  =`Medel: ${fmt0(avg)} öre/kWh`;
-    statLow.textContent  =`Lägst: ${fmt0(lo)} öre/kWh (${tf(series[iLo])})`;
-    statHigh.textContent =`Högst: ${fmt0(hi)} öre/kWh (${tf(series[iHi])})`;
+    renderStats(series);
     stampDate(isToday);
     drawFullDay(series);
   }
