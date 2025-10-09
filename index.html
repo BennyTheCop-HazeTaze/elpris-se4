@@ -2,7 +2,7 @@
 <html lang="sv">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Elpris SE4 – Trim/Scroll (inkl. moms)</title>
+<title>Elpris SE4 – inkl. moms (dagvy)</title>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -25,19 +25,19 @@
   .yLabel{fill:var(--muted);font-size:calc(14px*var(--s))}
   .xLabel{fill:var(--muted);font-size:calc(13px*var(--s))}
   .bar{opacity:.95;rx:calc(7px*var(--s));ry:calc(7px*var(--s))}
-  .bar.now{filter:drop-shadow(0 0 calc(6px*var(--s)) rgba(255,209,102,.45))}
-  .barLabel{
-    fill:#fff;font-weight:700;text-anchor:middle;
-    font-size:calc(16px*var(--s));
-    paint-order:stroke;stroke:#000;stroke-width:calc(3px*var(--s));stroke-opacity:.35;
-  }
+  .bar.past{opacity:.7}
   .nowLine{stroke:var(--now);stroke-width:2.2;stroke-dasharray:4 3;opacity:.95}
   .nowDot{fill:var(--now);stroke:#000;stroke-width:calc(2px*var(--s));stroke-opacity:.35}
   .nowTag{fill:#fff;font-weight:800;text-anchor:middle;font-size:calc(14px*var(--s));
           paint-order:stroke;stroke:#000;stroke-width:calc(3px*var(--s));stroke-opacity:.35}
+  .val{
+    fill:#fff;font-weight:700;text-anchor:middle;
+    font-size:calc(12px*var(--s)); /* liten men läsbar */
+    paint-order:stroke;stroke:#000;stroke-width:calc(3px*var(--s));stroke-opacity:.35;
+  }
   .footer{display:flex;flex-wrap:wrap;align-items:center;gap:calc(8px*var(--s));padding:0 calc(8px*var(--s)) calc(4px*var(--s))}
   .title{font-weight:800;font-size:calc(18px*var(--s))}
-  .live,.badge{background:var(--chip);border:1px solid var(--chip-b);border-radius:calc(8px*var(--s));padding:calc(4px*var(--s)) calc(8px*var(--s));font-size:calc(12px*var(--s))}
+  .badge{background:var(--chip);border:1px solid var(--chip-b);border-radius:calc(8px*var(--s));padding:calc(4px*var(--s)) calc(8px*var(--s));font-size:calc(12px*var(--s))}
   .meta{opacity:.95;font-size:calc(13px*var(--s));margin-left:auto}
   .group{display:flex;gap:calc(6px*var(--s));flex-wrap:wrap}
   .btn{background:var(--chip);border:1px solid var(--chip-b);color:var(--fg);border-radius:calc(10px*var(--s));padding:calc(6px*var(--s)) calc(10px*var(--s));font-size:calc(13px*var(--s));cursor:pointer}
@@ -50,15 +50,13 @@
   </div>
   <div class="footer">
     <div class="title">Elpris SE4</div>
-    <span id="liveNow" class="live">Just nu: –</span>
+    <span id="liveNow" class="badge">Just nu: –</span>
     <span id="statRange" class="badge">–</span>
     <span id="statAvg"   class="badge">–</span>
     <span id="statLow"   class="badge">–</span>
     <span id="statHigh"  class="badge">–</span>
     <div class="meta" id="stamp">–</div>
     <div class="group">
-      <button class="btn" id="btnTrim">Trim</button>
-      <button class="btn" id="btnScroll">Scroll</button>
       <button class="btn" id="btnToday">Idag</button>
       <button class="btn" id="btnTomorrow">Imorgon</button>
     </div>
@@ -70,15 +68,9 @@
   const TZ="Europe/Stockholm", VAT=1.25, $=s=>document.querySelector(s);
   const chart=$("#chart");
   const statRange=$("#statRange"), statAvg=$("#statAvg"), statLow=$("#statLow"), statHigh=$("#statHigh"), stamp=$("#stamp"), liveNow=$("#liveNow");
-  const btnTrim=$("#btnTrim"), btnScroll=$("#btnScroll"), btnToday=$("#btnToday"), btnTomorrow=$("#btnTomorrow");
+  const btnToday=$("#btnToday"), btnTomorrow=$("#btnTomorrow");
 
-  const qp=new URLSearchParams(location.search);
-  let mode=(qp.get("mode")==="scroll")?"scroll":"trim";    // trim | scroll
-  let windowHours=Math.max(4,Math.min(24, +(qp.get("window")||16)));
-  let backMinutes=Math.max(0,Math.min(120, +(qp.get("back")||30)));
-  function markMode(){ btnTrim.classList.toggle("active",mode==="trim"); btnScroll.classList.toggle("active",mode==="scroll"); }
-
-  // Responsiv skalning från totalhöjd
+  // Skala från faktisk höjd
   new ResizeObserver(es=>{
     for(const e of es){
       const s=Math.max(0.55, Math.min(1.1, e.contentRect.height/340));
@@ -86,20 +78,23 @@
     }
   }).observe(document.querySelector('#wrap'));
 
-  // Data
+  // URLs
   const bust=()=>`?v=${Date.now()}`;
   const URL_TODAY="./data/today.json"+bust(), URL_TOMORROW="./data/tomorrow.json"+bust();
+
   let rowsToday=null, rowsTomorrow=null, currentDay="today";
 
   async function fetchJson(u){ const r=await fetch(u,{cache:'no-store'}); if(!r.ok) throw new Error(r.status); return r.json(); }
+
   function toSeries(rows){
     return rows.map(r=>{
       const ts=new Date(r.time_start), te=new Date(r.time_end);
-      const value=(r.SEK_per_kWh||0)*100*VAT; // öre/kWh inkl. moms
+      const value=(r.SEK_per_kWh||0)*100*VAT; // öre inkl. moms
       const label=ts.toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit',timeZone:TZ});
       return {ts,te,value,label};
     });
   }
+
   function computeLevels(series){
     const arr=series.map(d=>d.value).slice().sort((a,b)=>a-b);
     const t33=arr[Math.floor((arr.length-1)*0.33)], t66=arr[Math.floor((arr.length-1)*0.66)];
@@ -108,7 +103,11 @@
       else d.level=(d.value<=t33)?"green":(d.value<=t66)?"yellow":"red";
     });
   }
-  function nowRounded(){ const n=new Date(new Date().toLocaleString('en-CA',{timeZone:TZ})); n.setSeconds(0,0); n.setMinutes(Math.floor(n.getMinutes()/15)*15); return n; }
+
+  function nowInTZ(){
+    // robust "nu" i samma tidszon som filens ISO-stämplar
+    return new Date(); // ISO från API innehåller offset (+01/+02), Date jämförelsen funkar direkt
+  }
 
   const nf0=new Intl.NumberFormat('sv-SE',{maximumFractionDigits:0});
   const nf2=new Intl.NumberFormat('sv-SE',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -123,44 +122,28 @@
     statLow.textContent  =`Lägst: ${fmt0(lo)} öre/kWh (${tf(series[iLo])})`;
     statHigh.textContent =`Högst: ${fmt0(hi)} öre/kWh (${tf(series[iHi])})`;
   }
+
   function stampDate(isToday){
     const f=new Intl.DateTimeFormat('sv-SE',{weekday:'short',day:'2-digit',month:'short'});
     stamp.textContent=(isToday?"Idag ":"Imorgon ")+f.format(isToday?new Date():new Date(Date.now()+86400000));
   }
 
-  // Trim: nu−back → slutet. Scroll: fönster centrerat kring nu.
-  function sliceTrim(series){
-    const n=nowRounded(); const idx=series.findIndex(d=>d.ts.getTime()===n.getTime());
-    if(idx<0) return series;
-    const back=Math.round(backMinutes/15); const start=Math.max(0,idx-back);
-    return series.slice(start);
-  }
-  function sliceScroll(series){
-    const n=nowRounded(); const idx=series.findIndex(d=>d.ts.getTime()===n.getTime());
-    if(idx<0) return series;
-    const slots=Math.min(series.length, Math.round((windowHours*60)/15));
-    const half=Math.floor(slots/2);
-    const start=Math.max(0, Math.min(series.length-slots, idx-half));
-    return series.slice(start,start+slots);
-  }
-
-  function draw(seriesAll){
-    const visible=(mode==="trim")?sliceTrim(seriesAll):sliceScroll(seriesAll);
-
+  function drawFullDay(series){
     const W=1000,H=360,padL=12,padR=64,padT=6;
     const s=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--s'))||1;
     const padB=Math.max(22, 38*s);
     chart.setAttribute("viewBox",`0 0 ${W} ${H}`); chart.innerHTML="";
 
-    const vals=visible.map(d=>d.value), vMin=Math.min(...vals), vMax=Math.max(...vals);
+    const vals=series.map(d=>d.value), vMin=Math.min(...vals), vMax=Math.max(...vals);
     const niceMax=Math.ceil(vMax/10)*10, niceMin=Math.floor(Math.min(vMin,0)/10)*10;
     const plotW=W-padL-padR, plotH=H-padT-padB;
 
-    const n=visible.length;
+    const n=series.length;
     const ideal=plotW/n;
     let gap=Math.max(0.5, Math.round(ideal*0.08));
     let barW=ideal-gap;
-    if(barW<11){ gap=0.5; barW=Math.max(7.5, plotW/n-gap); }
+    if(barW<10){ gap=0.5; barW=Math.max(7.5, plotW/n-gap); }
+
     const yScale=v=>padT+(1-(v-niceMin)/(niceMax-niceMin))*plotH;
     const xAt=i=>padL+i*(barW+gap);
 
@@ -178,41 +161,51 @@
     }
     chart.appendChild(g);
 
-    // NU-linje + prick + text, och footer "Just nu"
-    const nRef=nowRounded();
-    const idxAll=seriesAll.findIndex(d=>d.ts.getTime()===nRef.getTime());
-    if(idxAll>=0){
-      const nowPoint=seriesAll[idxAll];
-      liveNow.textContent=`Just nu: ${nf2.format(nowPoint.value/100)} kr/kWh (${nowPoint.label})`;
-      const idxVis=visible.findIndex(d=>d.ts.getTime()===nRef.getTime());
-      if(idxVis>=0){
-        const x=xAt(idxVis)+barW/2, y=yScale(visible[idxVis].value);
-        const nl=document.createElementNS("http://www.w3.org/2000/svg","line");
-        nl.setAttribute("x1",x); nl.setAttribute("x2",x); nl.setAttribute("y1",padT); nl.setAttribute("y2",padT+plotH);
-        nl.setAttribute("class","nowLine"); chart.appendChild(nl);
-        const dot=document.createElementNS("http://www.w3.org/2000/svg","circle");
-        dot.setAttribute("cx",x); dot.setAttribute("cy",y); dot.setAttribute("r",Math.max(4,6*s)); dot.setAttribute("class","nowDot"); chart.appendChild(dot);
-        const tag=document.createElementNS("http://www.w3.org/2000/svg","text");
-        tag.setAttribute("x",x); tag.setAttribute("y",Math.max(padT+14*s,y-8)); tag.setAttribute("class","nowTag");
-        tag.textContent=`Nu ${fmt0(visible[idxVis].value)} öre`; chart.appendChild(tag);
-      }
-    } else { liveNow.textContent="Just nu: –"; }
+    // Nu-slot via ts <= now < te (robust mot tidszon/kvart)
+    const now=nowInTZ();
+    const idxNow=series.findIndex(d=> now>=d.ts && now<d.te);
 
-    // Etikett-densitet (heltimmar vid kvartstaxa)
+    // NU-linje + prick + text + footer
+    if(idxNow>=0){
+      const d=series[idxNow];
+      const x=xAt(idxNow)+barW/2; const y=yScale(d.value);
+      const nl=document.createElementNS("http://www.w3.org/2000/svg","line");
+      nl.setAttribute("x1",x); nl.setAttribute("x2",x); nl.setAttribute("y1",padT); nl.setAttribute("y2",padT+plotH);
+      nl.setAttribute("class","nowLine"); chart.appendChild(nl);
+      const dot=document.createElementNS("http://www.w3.org/2000/svg","circle");
+      dot.setAttribute("cx",x); dot.setAttribute("cy",y); dot.setAttribute("r",Math.max(4,6*s)); dot.setAttribute("class","nowDot"); chart.appendChild(dot);
+      const tag=document.createElementNS("http://www.w3.org/2000/svg","text");
+      tag.setAttribute("x",x); tag.setAttribute("y",Math.max(padT+14*s,y-8)); tag.setAttribute("class","nowTag");
+      tag.textContent=`Nu ${fmt0(d.value)} öre`; chart.appendChild(tag);
+      liveNow.textContent=`Just nu: ${nf2.format(d.value/100)} kr/kWh (${d.label})`;
+    } else {
+      liveNow.textContent="Just nu: –";
+    }
+
+    // X-etiketter (var heltimme om kvartstaxa)
+    const isQuarter = n>48;
     let every=1; if(barW<28) every=2; if(barW<20) every=3; if(barW<15) every=4;
-    const isQuarter=(seriesAll.length>48);
 
-    // Staplar
     for(let i=0;i<n;i++){
-      const d=visible[i], x=xAt(i), y=yScale(d.value), h=Math.max(1,(padT+plotH)-y);
+      const d=series[i], x=xAt(i), y=yScale(d.value), h=Math.max(1,(padT+plotH)-y);
+
       const r=document.createElementNS("http://www.w3.org/2000/svg","rect");
       r.setAttribute("x",x); r.setAttribute("y",y); r.setAttribute("width",barW); r.setAttribute("height",h);
-      r.style.fill = d.level==="neg" ? "var(--blue)" :
+      r.style.fill = d.value<0 ? "var(--blue)" :
                      d.level==="green" ? "var(--green)" :
                      d.level==="yellow" ? "var(--yellow)" : "var(--red)";
-      r.classList.add("bar"); chart.appendChild(r);
+      if(i<idxNow) r.classList.add("bar","past"); else r.classList.add("bar");
+      chart.appendChild(r);
 
-      // X-etiketter
+      // alla staplar får pris – liten vertikal text, flytta ovan om stapeln är låg
+      const lbl=document.createElementNS("http://www.w3.org/2000/svg","text");
+      lbl.setAttribute("class","val");
+      const cy = (h>(20*s)) ? (y + Math.min(h-8, Math.max(14, h*0.55))) : (y - 5);
+      lbl.setAttribute("transform",`rotate(-90 ${x+barW/2} ${cy})`);
+      lbl.setAttribute("x",x+barW/2); lbl.setAttribute("y",cy);
+      lbl.textContent=fmt0(d.value);
+      chart.appendChild(lbl);
+
       const showX=(i%every===0) && (isQuarter ? (d.ts.getMinutes()===0) : true);
       if(showX){
         const t=document.createElementNS("http://www.w3.org/2000/svg","text");
@@ -220,44 +213,33 @@
         t.setAttribute("text-anchor","middle"); t.setAttribute("class","xLabel"); t.textContent=d.label;
         chart.appendChild(t);
       }
-
-      // Prisvärde på/över stapeln (>=30 öre eller <0, och läsbart)
-      if((d.value>=30 || d.value<0) && barW>=12){
-        const lbl=document.createElementNS("http://www.w3.org/2000/svg","text");
-        lbl.setAttribute("class","barLabel");
-        const cy = (h>(26*s)) ? (y + Math.min(h-10, Math.max(16, h*0.55))) : (y - 6);
-        lbl.setAttribute("x",x+barW/2); lbl.setAttribute("y",cy);
-        lbl.textContent=fmt0(d.value);
-        chart.appendChild(lbl);
-      }
     }
   }
 
-  function renderAll(rows){
+  function renderAll(rows,isToday){
     const series=toSeries(rows);
     computeLevels(series);
     renderStats(series);
-    stampDate(currentDay==="today");
-    draw(series);
+    stampDate(isToday);
+    drawFullDay(series);
   }
 
   async function init(){
     try{ rowsToday=await fetchJson(URL_TODAY);}catch{ rowsToday=[]; }
     try{ rowsTomorrow=await fetchJson(URL_TOMORROW);}catch{ rowsTomorrow=null; }
     btnTomorrow.disabled = !(rowsTomorrow && rowsTomorrow.length);
-    currentDay="today"; btnToday.classList.add("active"); btnTomorrow.classList.remove("active");
-    markMode(); renderAll(rowsToday);
+
+    // start med Idag
+    currentDay="today"; btnToday.classList.add("active");
+    renderAll(rowsToday,true);
   }
 
-  // Knappar
-  btnTrim.onclick  =()=>{ mode="trim";   markMode(); renderAll(currentDay==="today"?rowsToday:rowsTomorrow); };
-  btnScroll.onclick=()=>{ mode="scroll"; markMode(); renderAll(currentDay==="today"?rowsToday:rowsTomorrow); };
-  btnToday.onclick =()=>{ currentDay="today";   btnToday.classList.add("active"); btnTomorrow.classList.remove("active"); renderAll(rowsToday); };
-  btnTomorrow.onclick=()=>{ if(btnTomorrow.disabled) return; currentDay="tomorrow"; btnTomorrow.classList.add("active"); btnToday.classList.remove("active"); renderAll(rowsTomorrow); };
+  // Knappar (bara Idag/Imorgon)
+  btnToday.onclick =()=>{ currentDay="today";   btnToday.classList.add("active"); btnTomorrow.classList.remove("active"); renderAll(rowsToday,true); };
+  btnTomorrow.onclick=()=>{ if(btnTomorrow.disabled) return; currentDay="tomorrow"; btnTomorrow.classList.add("active"); btnToday.classList.remove("active"); renderAll(rowsTomorrow,false); };
 
   init();
-  setInterval(init, 30*60*1000);  // auto-refresh
+  setInterval(init, 30*60*1000); // periodisk uppfräschning
 })();
 </script>
 </html>
-<!-- rebuild -->
