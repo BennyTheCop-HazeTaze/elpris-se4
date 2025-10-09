@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="sv">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Elpris SE4 – RT (Trim & Scroll, inkl. moms)</title>
+<style>
+  :root{
+    --fg:#e8edf2; --muted:#cfe0f4; --grid:#253044; --now:#ffd166;
+    --green:#2e8f5b; --yellow:#d9b43b; --red:#c34a4a;
+    --chip:#1a2230; --chip-b:#2b3547; --chip-a:#2e3a52;
+    --s:1;
+  }
+  html,body{height:100%;margin:0;background:transparent;color:var(--fg);font-family:system-ui,Segoe UI,Roboto;overflow:hidden}
+  #wrap{height:100%;display:grid;grid-template-rows:1fr auto;min-height:0;gap:calc(6px*var(--s))}
+  .panel{min-height:0;overflow:hidden}
+  svg{width:100%;height:100%}
+  .grid line{stroke:var(--grid);stroke-width:1}
+  .yLabel{fill:var(--muted);font-size:calc(14px*var(--s))}
+  .xLabel{fill:var(--muted);font-size:calc(13px*var(--s))}
+  .bar{opacity:.95;rx:calc(7px*var(--s));ry:calc(7px*var(--s))}
+  .bar.now{fill:var(--now);filter:drop-shadow(0 0 calc(6px*var(--s)) rgba(255,209,102,.5))}
+  .barLabel{fill:#fff;font-weight:700;text-anchor:middle;dominant-baseline:middle;font-size:calc(18px*var(--s));paint-order:stroke;stroke:#000;stroke-width:calc(3px*var(--s));stroke-opacity:.35}
+  .nowLine{stroke:var(--now);stroke-width:2;stroke-dasharray:4 3;opacity:.9}
+  .footer{display:flex;flex-wrap:wrap;align-items:center;gap:calc(8px*var(--s));padding:0 calc(8px*var(--s)) calc(4px*var(--s))}
+  .title{font-weight:800;font-size:calc(18px*var(--s))}
+  .stats{display:flex;gap:calc(6px*var(--s));flex-wrap:wrap}
+  .badge{background:var(--chip);border:1px solid var(--chip-b);border-radius:calc(8px*var(--s));padding:calc(4px*var(--s)) calc(8px*var(--s));font-size:calc(12px*var(--s))}
+  .meta{opacity:.95;font-size:calc(13px*var(--s));margin-left:auto}
+  .group{display:flex;gap:calc(6px*var(--s));flex-wrap:wrap}
+  .btn{background:var(--chip);border:1px solid var(--chip-b);color:var(--fg);border-radius:calc(10px*var(--s));padding:calc(6px*var(--s)) calc(10px*var(--s));font-size:calc(13px*var(--s));cursor:pointer}
+  .btn.active{background:var(--chip-a);border-color:#3d4c6a}
+</style>
+
+<div id="wrap">
+  <div class="panel">
+    <svg id="chart" viewBox="0 0 1000 360" preserveAspectRatio="none" aria-label="Elprisgraf"></svg>
+  </div>
+  <div class="footer">
+    <div class="title">Elpris SE4</div>
+    <div class="stats">
+      <span id="statRange" class="badge">–</span>
+      <span id="statAvg"   class="badge">–</span>
+      <span id="statLow"   class="badge">–</span>
+      <span id="statHigh"  class="badge">–</span>
+    </div>
+    <div class="meta" id="stamp">–</div>
+    <div class="group">
+      <button class="btn" id="btnTrim">Trim</button>
+      <button class="btn" id="btnScroll">Scroll</button>
+      <button class="btn" id="btnToday">Idag</button>
+      <button class="btn" id="btnTomorrow">Imorgon</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(()=> {
+  const TZ="Europe/Stockholm", VAT=1.25, $=s=>document.querySelector(s);
+  const chart=$("#chart");
+  const statRange=$("#statRange"), statAvg=$("#statAvg"), statLow=$("#statLow"), statHigh=$("#statHigh"), stamp=$("#stamp");
+  const btnTrim=$("#btnTrim"), btnScroll=$("#btnScroll"), btnToday=$("#btnToday"), btnTomorrow=$("#btnTomorrow");
+  const qp=new URLSearchParams(location.search);
+  let mode=(qp.get("mode")==="scroll")?"scroll":"trim"; let windowHours=Math.max(4,Math.min(24,+(qp.get("window")||16))); let backMinutes=Math.max(0,Math.min(120,+(qp.get("back")||30)));
+  function markMode(){ btnTrim.classList.toggle("active",mode==="trim"); btnScroll.classList.toggle("active",mode==="scroll"); }
+  // skala av hela widgetens höjd
+  const ro=new ResizeObserver(es=>{ for(const e of es){ const h=e.contentRect.height; const s=Math.max(0.55,Math.min(1.1,h/340)); document.documentElement.style.setProperty('--s', s.toFixed(3)); }});
+  ro.observe(document.querySelector('#wrap'));
+
+  const bust=()=>`?v=${Date.now()}`; const URL_TODAY="../data/today.json"+bust(), URL_TOMORROW="../data/tomorrow.json"+bust();
+  let rowsToday=null, rowsTomorrow=null, currentDay="today";
+  async function fetchJson(u){ const r=await fetch(u,{cache:'no-store'}); if(!r.ok) throw new Error(r.status); return r.json(); }
+  function toSeries(rows){ return rows.map(r=>{ const ts=new Date(r.time_start), te=new Date(r.time_end); const value=(r.SEK_per_kWh||0)*100*VAT; const s=ts.toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit',timeZone:TZ}); return {ts,te,value,label:s}; });}
+  function computeLevels(series){ const arr=series.map(d=>d.value).slice().sort((a,b)=>a-b); const t33=arr[Math.floor((arr.length-1)*0.33)], t66=arr[Math.floor((arr.length-1)*0.66)]; series.forEach(d=>d.level=(d.value<=t33)?"green":(d.value<=t66)?"yellow":"red"); }
+  function nowRounded(){ const n=new Date(new Date().toLocaleString('en-CA',{timeZone:TZ})); n.setSeconds(0,0); n.setMinutes(Math.floor(n.getMinutes()/15)*15); return n; }
+  const nf0=new Intl.NumberFormat('sv-SE',{maximumFractionDigits:0}); const fmt0=n=>nf0.format(n), fmt10=n=>nf0.format(Math.round(n/10)*10);
+  function renderStats(series){ const v=series.map(d=>d.value), lo=Math.min(...v), hi=Math.max(...v), avg=v.reduce((a,b)=>a+b,0)/v.length; const iLo=v.indexOf(lo), iHi=v.indexOf(hi); const tf=d=> d.ts.toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit',timeZone:TZ}); statRange.textContent=`Intervall: ${fmt10(lo)}–${fmt10(hi)} öre/kWh`; statAvg.textContent=`Medel: ${fmt0(avg)} öre/kWh`; statLow.textContent=`Lägst: ${fmt0(lo)} öre/kWh (${tf(series[iLo])})`; statHigh.textContent=`Högst: ${fmt0(hi)} öre/kWh (${tf(series[iHi])})`; }
+  function stampDate(isToday){ const f=new Intl.DateTimeFormat('sv-SE',{weekday:'short',day:'2-digit',month:'short'}); const base=isToday?new Date():new Date(Date.now()+86400000); stamp.textContent=(isToday?"Idag ":"Imorgon ")+f.format(base); }
+  // skära vy
+  function sliceTrim(series){ const n=nowRounded(); const idx=series.findIndex(d=>d.ts.getTime()===n.getTime()); if(idx<0) return series; const back=Math.round(backMinutes/15); const start=Math.max(0,idx-back); return series.slice(start); }
+  function sliceScroll(series){ const n=nowRounded(); const idx=series.findIndex(d=>d.ts.getTime()===n.getTime()); if(idx<0) return series; const slots=Math.min(series.length, Math.round((windowHours*60)/15)); const half=Math.floor(slots/2); const start=Math.max(0, Math.min(series.length-slots, idx-half)); return series.slice(start,start+slots); }
+  // rita
+  function drawChart(seriesAll){
+    const vis=(mode==="trim")?sliceTrim(seriesAll):sliceScroll(seriesAll);
+    const W=1000,H=360,padL=12,padR=56,padT=6; const s=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--s'))||1; const padB=Math.max(22, 36*s);
+    chart.setAttribute("viewBox",`0 0 ${W} ${H}`); chart.innerHTML="";
+    const vals=vis.map(d=>d.value), vMin=Math.min(...vals), vMax=Math.max(...vals); const niceMax=Math.ceil(vMax/10)*10, niceMin=Math.floor(Math.min(vMin,0)/10)*10;
+    const plotW=W-padL-padR, plotH=H-padT-padB;
+    const n=vis.length; const ideal=plotW/n; let gap=Math.max(1, Math.round(ideal*0.10)); let barW=ideal-gap; if(barW<12){ gap=1; barW=Math.max(8, plotW/n-gap); }
+    const yScale=v=>padT+(1-(v-niceMin)/(niceMax-niceMin))*plotH; const xAt=i=>padL+i*(barW+gap);
+    const g=document.createElementNS("http://www.w3.org/2000/svg","g"); g.setAttribute("class","grid");
+    for(let i=0;i<=5;i++){ const val=niceMin+i*(niceMax-niceMin)/5, y=yScale(val);
+      const line=document.createElementNS("http://www.w3.org/2000/svg","line"); line.setAttribute("x1",padL); line.setAttribute("x2",W-padR); line.setAttribute("y1",y); line.setAttribute("y2",y); g.appendChild(line);
+      const t=document.createElementNS("http://www.w3.org/2000/svg","text"); t.setAttribute("x",W-padR+8); t.setAttribute("y",y+5); t.setAttribute("text-anchor","start"); t.setAttribute("class","yLabel"); t.textContent=fmt0(val); g.appendChild(t);
+    }
+    chart.appendChild(g);
+    const nRef=nowRounded(); const iNow=vis.findIndex(d=>d.ts.getTime()===nRef.getTime());
+    if(iNow>=0){ const x=xAt(iNow)+barW/2; const nl=document.createElementNS("http://www.w3.org/2000/svg","line"); nl.setAttribute("x1",x); nl.setAttribute("x2",x); nl.setAttribute("y1",padT); nl.setAttribute("y2",padT+plotH); nl.setAttribute("class","nowLine"); chart.appendChild(nl); }
+    let every=1; if(barW<28) every=2; if(barW<20) every=3; if(barW<15) every=4; const isQuarter=(seriesAll.length>48);
+    for(let i=0;i<n;i++){
+      const d=vis[i], x=xAt(i), y=yScale(d.value), h=Math.max(1,(padT+plotH)-y);
+      const r=document.createElementNS("http://www.w3.org/2000/svg","rect"); r.setAttribute("x",x); r.setAttribute("y",y); r.setAttribute("width",barW); r.setAttribute("height",h); r.setAttribute("rx",7*s); r.setAttribute("ry",7*s);
+      r.style.fill=(d.level==="green")?"var(--green)":(d.level==="yellow")?"var(--yellow)":"var(--red)"; r.setAttribute("class",(i===iNow)?"bar now":"bar"); chart.appendChild(r);
+      const show=(i%every===0) && (isQuarter ? (d.ts.getMinutes()===0) : true);
+      if(show){ const t=document.createElementNS("http://www.w3.org/2000/svg","text"); t.setAttribute("x",x+barW/2); t.setAttribu
