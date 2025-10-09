@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="sv">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Probe – yttest för DAKboard</title>
+<style>
+  html,body{height:100%;margin:0;background:transparent;font-family:system-ui,Segoe UI,Roboto}
+  #wrap{height:100%;display:grid;grid-template-rows:1fr auto;gap:8px;box-sizing:border-box}
+  .panel{min-height:0;overflow:hidden;display:grid;place-items:center;background:rgba(0,0,0,.15);border-radius:8px}
+  .panel > div{font-size:18px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+  .footer{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:center;color:#fff}
+  .chip{background:rgba(0,0,0,.35);padding:6px 10px;border-radius:10px}
+</style>
+<div id="wrap">
+  <div class="panel"><div id="size">–</div></div>
+  <div class="footer">
+    <span class="chip">Probe</span>
+    <span class="chip" id="ua">–</span>
+    <span class="chip" id="ts">–</span>
+  </div>
+</div>
+<script>
+  const sizeEl=document.getElementById('size'), ua=document.getElementById('ua'), ts=document.getElementById('ts');
+  const ro=new ResizeObserver(es=>{ for(const e of es){ sizeEl.textContent = `${Math.round(e.contentRect.width)} × ${Math.round(e.contentRect.height)} px`; }});
+  ro.observe(document.getElementById('wrap'));
+  ua.textContent = navigator.userAgent.split(' ').slice(-1)[0];
+  setInterval(()=>{ ts.textContent = new Date().toLocaleTimeString('sv-SE'); }, 1000);
+</script>
+</html>
