@@ -101,4 +101,27 @@
       const r=document.createElementNS("http://www.w3.org/2000/svg","rect"); r.setAttribute("x",x); r.setAttribute("y",y); r.setAttribute("width",barW); r.setAttribute("height",h); r.setAttribute("rx",7*s); r.setAttribute("ry",7*s);
       r.style.fill=(d.level==="green")?"var(--green)":(d.level==="yellow")?"var(--yellow)":"var(--red)"; r.setAttribute("class",(i===iNow)?"bar now":"bar"); chart.appendChild(r);
       const show=(i%every===0) && (isQuarter ? (d.ts.getMinutes()===0) : true);
-      if(show){ const t=document.createElementNS("http://www.w3.org/2000/svg","text"); t.setAttribute("x",x+barW/2); t.setAttribu
+      if(show){ const t=document.createElementNS("http://www.w3.org/2000/svg","text"); t.setAttribute("x",x+barW/2); t.setAttribute("y",H-6); t.setAttribute("text-anchor","middle"); t.setAttribute("class","xLabel"); t.textContent=d.label; chart.appendChild(t); }
+      if(d.value>=30 && h>(26*s) && barW>=14){ const lbl=document.createElementNS("http://www.w3.org/2000/svg","text"); lbl.setAttribute("class","barLabel"); const cx=x+barW/2, cy=y+h/2; lbl.setAttribute("transform",`rotate(-90 ${cx} ${cy})`); lbl.setAttribute("x",cx); lbl.setAttribute("y",cy); lbl.textContent=fmt0(d.value); chart.appendChild(lbl); }
+    }
+  }
+
+  function renderAll(rows){ const series=toSeries(rows); computeLevels(series); renderStats(series); stampDate(currentDay==="today"); drawChart(series); }
+
+  async function init(){
+    try{ rowsToday=await fetchJson(URL_TODAY);}catch{ rowsToday=[]; }
+    try{ rowsTomorrow=await fetchJson(URL_TOMORROW);}catch{ rowsTomorrow=null; }
+    btnTomorrow.disabled = !(rowsTomorrow && rowsTomorrow.length);
+    currentDay="today"; btnToday.classList.add("active"); btnTomorrow.classList.remove("active");
+    markMode(); renderAll(rowsToday);
+  }
+
+  btnTrim.onclick=()=>{ mode="trim"; markMode(); renderAll((currentDay==="today")?rowsToday:rowsTomorrow); };
+  btnScroll.onclick=()=>{ mode="scroll"; markMode(); renderAll((currentDay==="today")?rowsToday:rowsTomorrow); };
+  btnToday.onclick =()=>{ currentDay="today"; btnToday.classList.add("active"); btnTomorrow.classList.remove("active"); renderAll(rowsToday); };
+  btnTomorrow.onclick=()=>{ if(btnTomorrow.disabled) return; currentDay="tomorrow"; btnTomorrow.classList.add("active"); btnToday.classList.remove("active"); renderAll(rowsTomorrow); };
+
+  init(); setInterval(init, 30*60*1000);
+})();
+</script>
+</html>
