@@ -2,7 +2,7 @@
 <html lang="sv">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Elpris SE4 – kompakt (inkl. moms)</title>
+<title>Elpris SE4 – Trim & Scroll (inkl. moms)</title>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
 <meta http-equiv="Pragma" content="no-cache" />
 <meta http-equiv="Expires" content="0" />
@@ -11,13 +11,12 @@
     --fg:#e8edf2; --muted:#cfe0f4; --grid:#253044; --now:#ffd166;
     --green:#2e8f5b; --yellow:#d9b43b; --red:#c34a4a;
     --chip:#1a2230; --chip-b:#2b3547; --chip-a:#2e3a52;
-    /* skala (sätts i JS med ResizeObserver) */
-    --s:1;
+    --s:1; /* skala sätts av ResizeObserver */
   }
   html,body{height:100%;margin:0;background:transparent;color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
   #wrap{display:flex;flex-direction:column;min-height:100%;gap:calc(6px*var(--s))}
 
-  /* PANEL (graf/lista) */
+  /* panel (graf/lista) */
   .panel{position:relative;flex:1;min-height:120px}
   svg{width:100%;height:100%}
   .grid line{stroke:var(--grid);stroke-width:1}
@@ -30,23 +29,9 @@
     font-size:calc(18px*var(--s));
     paint-order:stroke;stroke:#000;stroke-width:calc(3px*var(--s));stroke-opacity:.35;
   }
+  .nowLine{stroke:var(--now);stroke-width:2;stroke-dasharray:4 3;opacity:.9}
 
-  /* LISTA (avaktiverad som standard) */
-  .list{display:none;flex-direction:column;gap:calc(6px*var(--s));padding:0 calc(8px*var(--s))}
-  .hdr,.rowItem{
-    display:grid;grid-template-columns:minmax(90px,140px) minmax(90px,140px) 1fr;gap:calc(8px*var(--s));align-items:center;
-    padding:calc(8px*var(--s));border:1px solid rgba(60,75,95,.35);border-radius:calc(10px*var(--s));background:rgba(24,31,44,.22)
-  }
-  .hdr{font-weight:700;background:rgba(24,31,44,.32)}
-  .cell-time,.cell-price{font-variant-numeric:tabular-nums;font-size:calc(14px*var(--s))}
-  .meter{height:calc(12px*var(--s));border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden}
-  .meter>.fill{height:100%;border-radius:999px}
-  .nowRow{outline:calc(2px*var(--s)) solid var(--now);box-shadow:0 0 calc(10px*var(--s)) rgba(255,209,102,.35) inset}
-  .lvlGreen{background:rgba(46,143,91,.10);border-color:rgba(46,143,91,.25)}
-  .lvlYellow{background:rgba(217,180,59,.10);border-color:rgba(217,180,59,.25)}
-  .lvlRed{background:rgba(195,74,74,.10);border-color:rgba(195,74,74,.25)}
-
-  /* FOOTER (all text/knappar under grafen, responsiv & kompakt) */
+  /* footer (kompakt, radbrytbar) */
   .footer{display:flex;flex-wrap:wrap;align-items:center;gap:calc(8px*var(--s));padding:0 calc(8px*var(--s)) calc(6px*var(--s))}
   .title{font-weight:800;font-size:calc(18px*var(--s))}
   .stats{display:flex;gap:calc(6px*var(--s));flex-wrap:wrap}
@@ -60,7 +45,6 @@
 <div id="wrap">
   <div class="panel">
     <svg id="chart" viewBox="0 0 1000 360" preserveAspectRatio="none" aria-label="Elprisgraf"></svg>
-    <div id="list" class="list"></div>
   </div>
 
   <div class="footer">
@@ -73,10 +57,10 @@
     </div>
     <div class="meta" id="stamp">–</div>
     <div class="group">
-      <button class="btn active" data-day="today" id="btnToday">Idag</button>
-      <button class="btn" data-day="tomorrow" id="btnTomorrow">Imorgon</button>
-      <button class="btn active" data-mode="chart" id="btnChart">Graf</button>
-      <button class="btn" data-mode="list" id="btnList">Lista</button>
+      <button class="btn" id="btnTrim">Trim</button>
+      <button class="btn" id="btnScroll">Scroll</button>
+      <button class="btn" id="btnToday">Idag</button>
+      <button class="btn" id="btnTomorrow">Imorgon</button>
     </div>
   </div>
 </div>
@@ -84,66 +68,122 @@
 <script>
 (()=> {
   const TZ="Europe/Stockholm", VAT=1.25, $=s=>document.querySelector(s);
-  const chart=$("#chart"), listEl=$("#list");
-  const statRange=$("#statRange"), statAvg=$("#statAvg"), statLow=$("#statLow"), statHigh=$("#statHigh"), stamp=$("#stamp");
-  const btnToday=$("#btnToday"), btnTomorrow=$("#btnTomorrow"), btnChart=$("#btnChart"), btnList=$("#btnList");
-  const today=new Date(), tomorrow=new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
-  const bust=()=>`?v=${Date.now()}`;
-  const URL_TODAY="./data/today.json"+bust(), URL_TOMORROW="./data/tomorrow.json"+bust();
-  let rowsToday=null, rowsTomorrow=null, currentDay="today", currentMode="chart";
 
-  /* ===== Responsiv skala beroende på höjd ===== */
+  const chart=$("#chart");
+  const statRange=$("#statRange"), statAvg=$("#statAvg"), statLow=$("#statLow"), statHigh=$("#statHigh"), stamp=$("#stamp");
+  const btnTrim=$("#btnTrim"), btnScroll=$("#btnScroll"), btnToday=$("#btnToday"), btnTomorrow=$("#btnTomorrow");
+
+  // URL-params
+  const qp=new URLSearchParams(location.search);
+  let mode = (qp.get("mode")==="scroll") ? "scroll" : "trim";   // trim | scroll
+  let windowHours = Math.max(4, Math.min(24, +(qp.get("window")||16))); // scroll: fönster i timmar
+  let backMinutes = Math.max(0, Math.min(120, +(qp.get("back")||30)));  // trim: minuter bakåt (0–120)
+
+  // UI init from params
+  function setModeButtons(){
+    btnTrim.classList.toggle("active", mode==="trim");
+    btnScroll.classList.toggle("active", mode==="scroll");
+  }
+  setModeButtons();
+
+  // Autoskalning
   const ro=new ResizeObserver(entries=>{
     for(const e of entries){
-      const h=e.contentRect.height;           // tillgänglig höjd för panel+footer
-      // kalibrerad skala: ~360px bas → s=1, vid ~160px → s≈0.7, lägsta 0.6
+      const h=e.contentRect.height;
       const s=Math.max(0.6, Math.min(1.0, (h/360)));
       document.documentElement.style.setProperty('--s', s.toFixed(3));
     }
   });
   ro.observe(document.querySelector('#wrap'));
 
+  // Data
+  const bust=()=>`?v=${Date.now()}`;
+  const URL_TODAY="./data/today.json"+bust(), URL_TOMORROW="./data/tomorrow.json"+bust();
+  let rowsToday=null, rowsTomorrow=null, currentDay="today";
+
   async function fetchJson(u){ const r=await fetch(u,{cache:'no-store'}); if(!r.ok) throw new Error(r.status); return r.json(); }
+
   function toSeries(rows){
     return rows.map(r=>{
       const ts=new Date(r.time_start), te=new Date(r.time_end);
       const value=(r.SEK_per_kWh||0)*100*VAT;
       const s=ts.toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit',timeZone:TZ});
-      const e=te.toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit',timeZone:TZ});
-      return {ts,te,value,label:s,labelRange:`${s} – ${e}`};
+      return {ts,te,value,label:s};
     });
   }
+
   function computeLevels(series){
     const arr=series.map(d=>d.value).slice().sort((a,b)=>a-b);
     const thr33=arr[Math.floor((arr.length-1)*0.33)];
     const thr66=arr[Math.floor((arr.length-1)*0.66)];
     series.forEach(d=>d.level=(d.value<=thr33)?"green":(d.value<=thr66)?"yellow":"red");
   }
-  function nowRounded(){ const n=new Date(new Date().toLocaleString('en-CA',{timeZone:TZ})); n.setSeconds(0,0); n.setMinutes(Math.floor(n.getMinutes()/15)*15); return n; }
+
+  function nowRounded(){
+    const n=new Date(new Date().toLocaleString('en-CA',{timeZone:TZ}));
+    n.setSeconds(0,0); n.setMinutes(Math.floor(n.getMinutes()/15)*15); return n;
+  }
+
   const nf0=new Intl.NumberFormat('sv-SE',{maximumFractionDigits:0});
   const fmt0=n=>nf0.format(n), fmt10=n=>nf0.format(Math.round(n/10)*10);
+
   function renderStats(series){
     const v=series.map(d=>d.value), lo=Math.min(...v), hi=Math.max(...v), avg=v.reduce((a,b)=>a+b,0)/v.length;
     const iLo=v.indexOf(lo), iHi=v.indexOf(hi);
+    const timeFmt = d=> d.ts.toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit',timeZone:TZ});
     statRange.textContent=`Intervall: ${fmt10(lo)}–${fmt10(hi)} öre/kWh`;
     statAvg.textContent  =`Medel: ${fmt0(avg)} öre/kWh`;
-    statLow.textContent  =`Lägst: ${fmt0(lo)} öre/kWh (${series[iLo].label})`;
-    statHigh.textContent =`Högst: ${fmt0(hi)} öre/kWh (${series[iHi].label})`;
+    statLow.textContent  =`Lägst: ${fmt0(lo)} öre/kWh (${timeFmt(series[iLo])})`;
+    statHigh.textContent =`Högst: ${fmt0(hi)} öre/kWh (${timeFmt(series[iHi])})`;
   }
 
-  function drawChart(series){
+  function stampDate(isToday){
+    const f=new Intl.DateTimeFormat('sv-SE',{weekday:'short',day:'2-digit',month:'short'});
+    stamp.textContent=(isToday?"Idag ":"Imorgon ")+f.format(isToday?new Date():new Date(Date.now()+86400000));
+  }
+
+  function sliceTrim(series){
+    const nRef=nowRounded();
+    const idx=series.findIndex(d=>d.ts.getTime()===nRef.getTime());
+    if(idx<0) return series;
+    const backSlots=Math.round(backMinutes/15);
+    const start=Math.max(0, idx-backSlots);
+    return series.slice(start);
+  }
+
+  function sliceScroll(series){
+    const nRef=nowRounded();
+    const idx=series.findIndex(d=>d.ts.getTime()===nRef.getTime());
+    if(idx<0) return series;
+    const windowSlots=Math.min(series.length, Math.round((windowHours*60)/15));
+    const half=Math.floor(windowSlots/2);
+    const start = Math.max(0, Math.min(series.length-windowSlots, idx-half));
+    return series.slice(start, start+windowSlots);
+  }
+
+  function drawChart(seriesAll){
+    // välj synligt beroende på läge
+    const visible = (mode==="trim") ? sliceTrim(seriesAll) : sliceScroll(seriesAll);
+
     const s=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--s'))||1;
-    // mer kompakt: mindre bottenpadding så tiderna kommer nära staplarna
-    const W=1000,H=360,padL=12,padR=56,padT=6,padB=Math.max(36, 46*s);  // etiketter nära staplar
+    const W=1000,H=360,padL=12,padR=56,padT=6,padB=Math.max(36, 46*s);
     chart.setAttribute("viewBox",`0 0 ${W} ${H}`); chart.innerHTML="";
-    const vals=series.map(d=>d.value), vMin=Math.min(...vals), vMax=Math.max(...vals);
+
+    // skala i höjd
+    const vals=visible.map(d=>d.value), vMin=Math.min(...vals), vMax=Math.max(...vals);
     const niceMax=Math.ceil(vMax/10)*10, niceMin=Math.floor(Math.min(vMin,0)/10)*10;
-    const plotW=W-padL-padR, plotH=H-padT-padB, n=series.length, gap=2;
-    const barW=Math.max((plotW-(n-1)*gap)/n,2);
+    const plotW=W-padL-padR, plotH=H-padT-padB;
+
+    // bar-layout: säkerställ läsbar bredd
+    const n=visible.length;
+    const ideal = plotW/n;
+    let gap = Math.max(1, Math.round(ideal*0.10));     // 10% av cellen som gap
+    let barW = ideal - gap;
+    if (barW < 12) { gap = 1; barW = Math.max(8, plotW/n - gap); } // hårt minimum
     const yScale=v=>padT+(1-(v-niceMin)/(niceMax-niceMin))*plotH;
     const xAt=i=>padL+i*(barW+gap);
 
-    // grid + y till höger
+    // grid + y-etiketter till höger
     const g=document.createElementNS("http://www.w3.org/2000/svg","g"); g.setAttribute("class","grid");
     for(let i=0;i<=5;i++){
       const val=niceMin+i*(niceMax-niceMin)/5, y=yScale(val);
@@ -157,35 +197,46 @@
     }
     chart.appendChild(g);
 
-    const nowRef=nowRounded();
-    // bestäm hur täta tids-etiketter vi får plats med
-    let every=1;
-    if(barW < 26) every=2;
-    if(barW < 18) every=3;
-    if(barW < 14) every=4;
+    // “nu”-linje
+    const nRef=nowRounded();
+    const iNow=visible.findIndex(d=>d.ts.getTime()===nRef.getTime());
+    if(iNow>=0){
+      const x=xAt(iNow)+barW/2;
+      const nl=document.createElementNS("http://www.w3.org/2000/svg","line");
+      nl.setAttribute("x1",x); nl.setAttribute("x2",x); nl.setAttribute("y1",padT); nl.setAttribute("y2",padT+plotH);
+      nl.setAttribute("class","nowLine");
+      chart.appendChild(nl);
+    }
 
+    // bestäm x-etikett-densitet
+    let every=1;
+    if(barW < 28) every=2;
+    if(barW < 20) every=3;
+    if(barW < 15) every=4;
+
+    // rita bars
     for(let i=0;i<n;i++){
-      const d=series[i], x=xAt(i), y=yScale(d.value), h=Math.max(1,(padT+plotH)-y);
+      const d=visible[i], x=xAt(i), y=yScale(d.value), h=Math.max(1,(padT+plotH)-y);
       const r=document.createElementNS("http://www.w3.org/2000/svg","rect");
       r.setAttribute("x",x); r.setAttribute("y",y); r.setAttribute("width",barW); r.setAttribute("height",h);
       r.setAttribute("rx", 7*s); r.setAttribute("ry", 7*s);
-      r.style.fill = (d.level==="green")?"var(--green)":(d.level==="yellow")?"var(--yellow)":"var(--red)";
-      const same=(a,b)=>a.getFullYear()==b.getFullYear()&&a.getMonth()==b.getMonth()&&a.getDate()==b.getDate()&&a.getHours()==b.getHours()&&a.getMinutes()==b.getMinutes();
-      r.setAttribute("class", same(d.ts,nowRef) ? "bar now" : "bar");
+      r.style.fill=(d.level==="green")?"var(--green)":(d.level==="yellow")?"var(--yellow)":"var(--red)";
+      if(i===iNow) r.setAttribute("class","bar now"); else r.setAttribute("class","bar");
       chart.appendChild(r);
 
-      // tidsetiketter nära stapeln
-      const isQuarter = n>48;
-      const show = (i%every===0) && (isQuarter ? i%4===0 : true);
+      // x-etikett (tätare om det är timmar, glesare om kvartar)
+      const isQuarter = (seriesAll.length>48);
+      const show=(i%every===0) && (isQuarter ? ( (mode==="trim") ? ( (i%4===0) ) : ( (i%4===0) ) ) : true);
       if(show){
         const t=document.createElementNS("http://www.w3.org/2000/svg","text");
-        t.setAttribute("x",x+barW/2); t.setAttribute("y",H-6); // väldigt nära botten
-        t.setAttribute("text-anchor","middle"); t.setAttribute("class","xLabel"); t.textContent=d.label;
+        t.setAttribute("x",x+barW/2); t.setAttribute("y",H-6);
+        t.setAttribute("text-anchor","middle"); t.setAttribute("class","xLabel");
+        t.textContent=d.label;
         chart.appendChild(t);
       }
 
-      // pris i stapeln om tillräckligt högt och skalan inte för liten
-      if(d.value>=30 && h > (30*s) && s>=0.72){
+      // pris i stapeln om ≥30 öre och läsbart
+      if(d.value>=30 && h>(28*s) && barW>=14){
         const lbl=document.createElementNS("http://www.w3.org/2000/svg","text");
         lbl.setAttribute("class","barLabel");
         const cx=x+barW/2, cy=y+h/2;
@@ -196,66 +247,32 @@
     }
   }
 
-  function drawList(series){
-    listEl.innerHTML="";
-    listEl.style.display="flex";
-    const hdr=document.createElement("div"); hdr.className="hdr"; hdr.innerHTML="<div>Timme</div><div>Pris per kWh</div><div>Prisnivå</div>";
-    listEl.appendChild(hdr);
-    const nowRef=nowRounded();
-    const vals=series.map(d=>d.value); const vMin=Math.min(...vals), vMax=Math.max(...vals);
-
-    for(const d of series){
-      const row=document.createElement("div"); row.className="rowItem";
-      row.classList.add(d.level==="green"?"lvlGreen":d.level==="yellow"?"lvlYellow":"lvlRed");
-      const same=(a,b)=>a.getFullYear()==b.getFullYear()&&a.getMonth()==b.getMonth()&&a.getDate()==b.getDate()&&a.getHours()==b.getHours()&&a.getMinutes()==b.getMinutes();
-      if(same(d.ts,nowRef)) row.classList.add("nowRow");
-      const cTime=document.createElement("div"); cTime.className="cell-time"; cTime.textContent=d.labelRange;
-      const cPrice=document.createElement("div"); cPrice.className="cell-price"; cPrice.textContent=`${fmt0(d.value)} öre`;
-      const cLevel=document.createElement("div");
-      const meter=document.createElement("div"); meter.className="meter";
-      const fill=document.createElement("div"); fill.className="fill";
-      const pct=(d.value-vMin)/(vMax-vMin||1);
-      fill.style.width=Math.round(pct*100)+"%";
-      fill.style.background=(d.level==="green")?"var(--green)":(d.level==="yellow")?"var(--yellow)":"var(--red)";
-      meter.appendChild(fill); cLevel.appendChild(meter);
-      row.appendChild(cTime); row.appendChild(cPrice); row.appendChild(cLevel);
-      listEl.appendChild(row);
-    }
-  }
-
-  function stampDate(isToday){
-    const f=new Intl.DateTimeFormat('sv-SE',{weekday:'short',day:'2-digit',month:'short'});
-    stamp.textContent=(isToday?"Idag ":"Imorgon ")+f.format(isToday?today:tomorrow);
-  }
-
-  function render(){
-    const rows=(currentDay==="today")?rowsToday:rowsTomorrow;
-    if(!rows||!rows.length){ chart.innerHTML=""; listEl.style.display="none"; return; }
-    const series=toSeries(rows); computeLevels(series); renderStats(series); stampDate(currentDay==="today");
-    if(currentMode==="chart"){ listEl.style.display="none"; drawChart(series); }
-    else { drawList(series); }
-  }
-
-  function updateBtns(){
-    btnToday.classList.toggle("active", currentDay==="today");
-    btnTomorrow.classList.toggle("active", currentDay==="tomorrow");
-    btnChart.classList.toggle("active", currentMode==="chart");
-    btnList.classList.toggle("active", currentMode==="list");
+  function renderAll(rows){
+    const series=toSeries(rows);
+    computeLevels(series);
+    renderStats(series);
+    stampDate(currentDay==="today");
+    drawChart(series);
   }
 
   async function init(){
     try{ rowsToday=await fetchJson(URL_TODAY); }catch{ rowsToday=[]; }
     try{ rowsTomorrow=await fetchJson(URL_TOMORROW); }catch{ rowsTomorrow=null; }
-    if(!rowsTomorrow || !rowsTomorrow.length){ btnTomorrow.disabled=true; btnTomorrow.title="Imorgon-data ej publicerad ännu"; }
-    render();
+    btnTomorrow.disabled = !(rowsTomorrow && rowsTomorrow.length);
+    currentDay="today";
+    renderAll(rowsToday);
+    // set active states
+    btnToday.classList.add("active"); btnTomorrow.classList.remove("active");
   }
 
-  btnToday.onclick = ()=>{ currentDay="today"; updateBtns(); render(); };
-  btnTomorrow.onclick = ()=>{ currentDay="tomorrow"; updateBtns(); render(); };
-  btnChart.onclick = ()=>{ currentMode="chart"; updateBtns(); render(); };
-  btnList.onclick  = ()=>{ currentMode="list";  updateBtns(); render(); };
+  // Buttons
+  btnTrim.onclick = ()=>{ mode="trim"; setModeButtons(); renderAll( (currentDay==="today")?rowsToday:rowsTomorrow ); };
+  btnScroll.onclick=()=>{ mode="scroll"; setModeButtons(); renderAll( (currentDay==="today")?rowsToday:rowsTomorrow ); };
+  btnToday.onclick = ()=>{ currentDay="today"; btnToday.classList.add("active"); btnTomorrow.classList.remove("active"); renderAll(rowsToday); };
+  btnTomorrow.onclick=()=>{ if(btnTomorrow.disabled) return; currentDay="tomorrow"; btnTomorrow.classList.add("active"); btnToday.classList.remove("active"); renderAll(rowsTomorrow); };
 
   init();
+  // uppdatera då och då
   setInterval(init, 30*60*1000);
 })();
 </script>
