@@ -25,14 +25,17 @@
   .yLabel{fill:var(--muted);font-size:calc(14px*var(--s))}
   .xLabel{fill:var(--muted);font-size:calc(13px*var(--s))}
   .bar{opacity:.95;rx:calc(7px*var(--s));ry:calc(7px*var(--s))}
-  .bar.past{opacity:.7}
+  .bar.past{opacity:.5} /* starkare dimning */
   .nowLine{stroke:var(--now);stroke-width:2.2;stroke-dasharray:4 3;opacity:.95}
   .nowDot{fill:var(--now);stroke:#000;stroke-width:calc(2px*var(--s));stroke-opacity:.35}
   .nowTag{fill:#fff;font-weight:800;text-anchor:middle;font-size:calc(14px*var(--s));
           paint-order:stroke;stroke:#000;stroke-width:calc(3px*var(--s));stroke-opacity:.35}
+  /* mindre/smalare siffror i varje stapel + lite spacing */
   .val{
     fill:#fff;font-weight:700;text-anchor:middle;
-    font-size:calc(12px*var(--s)); /* liten men läsbar */
+    font-size:calc(10px*var(--s));
+    letter-spacing:0.6px;
+    font-family:"Roboto Condensed","Arial Narrow","Segoe UI",system-ui;
     paint-order:stroke;stroke:#000;stroke-width:calc(3px*var(--s));stroke-opacity:.35;
   }
   .footer{display:flex;flex-wrap:wrap;align-items:center;gap:calc(8px*var(--s));padding:0 calc(8px*var(--s)) calc(4px*var(--s))}
@@ -70,7 +73,6 @@
   const statRange=$("#statRange"), statAvg=$("#statAvg"), statLow=$("#statLow"), statHigh=$("#statHigh"), stamp=$("#stamp"), liveNow=$("#liveNow");
   const btnToday=$("#btnToday"), btnTomorrow=$("#btnTomorrow");
 
-  // Skala från faktisk höjd
   new ResizeObserver(es=>{
     for(const e of es){
       const s=Math.max(0.55, Math.min(1.1, e.contentRect.height/340));
@@ -78,11 +80,10 @@
     }
   }).observe(document.querySelector('#wrap'));
 
-  // URLs
   const bust=()=>`?v=${Date.now()}`;
   const URL_TODAY="./data/today.json"+bust(), URL_TOMORROW="./data/tomorrow.json"+bust();
 
-  let rowsToday=null, rowsTomorrow=null, currentDay="today";
+  let rowsToday=null, rowsTomorrow=null;
 
   async function fetchJson(u){ const r=await fetch(u,{cache:'no-store'}); if(!r.ok) throw new Error(r.status); return r.json(); }
 
@@ -94,7 +95,6 @@
       return {ts,te,value,label};
     });
   }
-
   function computeLevels(series){
     const arr=series.map(d=>d.value).slice().sort((a,b)=>a-b);
     const t33=arr[Math.floor((arr.length-1)*0.33)], t66=arr[Math.floor((arr.length-1)*0.66)];
@@ -103,11 +103,7 @@
       else d.level=(d.value<=t33)?"green":(d.value<=t66)?"yellow":"red";
     });
   }
-
-  function nowInTZ(){
-    // robust "nu" i samma tidszon som filens ISO-stämplar
-    return new Date(); // ISO från API innehåller offset (+01/+02), Date jämförelsen funkar direkt
-  }
+  function nowInTZ(){ return new Date(); }
 
   const nf0=new Intl.NumberFormat('sv-SE',{maximumFractionDigits:0});
   const nf2=new Intl.NumberFormat('sv-SE',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -122,7 +118,6 @@
     statLow.textContent  =`Lägst: ${fmt0(lo)} öre/kWh (${tf(series[iLo])})`;
     statHigh.textContent =`Högst: ${fmt0(hi)} öre/kWh (${tf(series[iHi])})`;
   }
-
   function stampDate(isToday){
     const f=new Intl.DateTimeFormat('sv-SE',{weekday:'short',day:'2-digit',month:'short'});
     stamp.textContent=(isToday?"Idag ":"Imorgon ")+f.format(isToday?new Date():new Date(Date.now()+86400000));
@@ -161,9 +156,18 @@
     }
     chart.appendChild(g);
 
-    // Nu-slot via ts <= now < te (robust mot tidszon/kvart)
     const now=nowInTZ();
     const idxNow=series.findIndex(d=> now>=d.ts && now<d.te);
+
+    // Dimma vänster sida lite extra (gardin)
+    if(idxNow>0){
+      const leftW = xAt(idxNow) - padL;
+      const shade=document.createElementNS("http://www.w3.org/2000/svg","rect");
+      shade.setAttribute("x",padL); shade.setAttribute("y",padT);
+      shade.setAttribute("width",leftW); shade.setAttribute("height",plotH);
+      shade.setAttribute("fill","#000"); shade.setAttribute("fill-opacity","0.18"); /* lite starkare dimning */
+      chart.appendChild(shade);
+    }
 
     // NU-linje + prick + text + footer
     if(idxNow>=0){
@@ -175,14 +179,16 @@
       const dot=document.createElementNS("http://www.w3.org/2000/svg","circle");
       dot.setAttribute("cx",x); dot.setAttribute("cy",y); dot.setAttribute("r",Math.max(4,6*s)); dot.setAttribute("class","nowDot"); chart.appendChild(dot);
       const tag=document.createElementNS("http://www.w3.org/2000/svg","text");
-      tag.setAttribute("x",x); tag.setAttribute("y",Math.max(padT+14*s,y-8)); tag.setAttribute("class","nowTag");
+      tag.setAttribute("x",x);
+      tag.setAttribute("y",Math.max(padT+22*s, y - 14*s)); /* högre upp än tidigare */
+      tag.setAttribute("class","nowTag");
       tag.textContent=`Nu ${fmt0(d.value)} öre`; chart.appendChild(tag);
       liveNow.textContent=`Just nu: ${nf2.format(d.value/100)} kr/kWh (${d.label})`;
     } else {
       liveNow.textContent="Just nu: –";
     }
 
-    // X-etiketter (var heltimme om kvartstaxa)
+    // X-etiketter: var heltimme vid kvartstaxa
     const isQuarter = n>48;
     let every=1; if(barW<28) every=2; if(barW<20) every=3; if(barW<15) every=4;
 
@@ -197,10 +203,10 @@
       if(i<idxNow) r.classList.add("bar","past"); else r.classList.add("bar");
       chart.appendChild(r);
 
-      // alla staplar får pris – liten vertikal text, flytta ovan om stapeln är låg
+      // siffra i varje stapel – liten, smal, roterad – flytta upp om stapeln är låg
       const lbl=document.createElementNS("http://www.w3.org/2000/svg","text");
       lbl.setAttribute("class","val");
-      const cy = (h>(20*s)) ? (y + Math.min(h-8, Math.max(14, h*0.55))) : (y - 5);
+      const cy = (h>(18*s)) ? (y + Math.min(h-6, Math.max(12, h*0.52))) : (y - 5);
       lbl.setAttribute("transform",`rotate(-90 ${x+barW/2} ${cy})`);
       lbl.setAttribute("x",x+barW/2); lbl.setAttribute("y",cy);
       lbl.textContent=fmt0(d.value);
@@ -219,7 +225,14 @@
   function renderAll(rows,isToday){
     const series=toSeries(rows);
     computeLevels(series);
-    renderStats(series);
+    // stats & header
+    const v=series.map(d=>d.value), lo=Math.min(...v), hi=Math.max(...v), avg=v.reduce((a,b)=>a+b,0)/v.length;
+    const iLo=v.indexOf(lo), iHi=v.indexOf(hi);
+    const tf=d=>d.ts.toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit',timeZone:TZ});
+    statRange.textContent=`Intervall: ${fmt10(lo)}–${fmt10(hi)} öre/kWh`;
+    statAvg.textContent  =`Medel: ${fmt0(avg)} öre/kWh`;
+    statLow.textContent  =`Lägst: ${fmt0(lo)} öre/kWh (${tf(series[iLo])})`;
+    statHigh.textContent =`Högst: ${fmt0(hi)} öre/kWh (${tf(series[iHi])})`;
     stampDate(isToday);
     drawFullDay(series);
   }
@@ -228,18 +241,15 @@
     try{ rowsToday=await fetchJson(URL_TODAY);}catch{ rowsToday=[]; }
     try{ rowsTomorrow=await fetchJson(URL_TOMORROW);}catch{ rowsTomorrow=null; }
     btnTomorrow.disabled = !(rowsTomorrow && rowsTomorrow.length);
-
-    // start med Idag
-    currentDay="today"; btnToday.classList.add("active");
+    btnToday.classList.add("active");
     renderAll(rowsToday,true);
   }
 
-  // Knappar (bara Idag/Imorgon)
-  btnToday.onclick =()=>{ currentDay="today";   btnToday.classList.add("active"); btnTomorrow.classList.remove("active"); renderAll(rowsToday,true); };
-  btnTomorrow.onclick=()=>{ if(btnTomorrow.disabled) return; currentDay="tomorrow"; btnTomorrow.classList.add("active"); btnToday.classList.remove("active"); renderAll(rowsTomorrow,false); };
+  btnToday.onclick =()=>{ btnToday.classList.add("active"); btnTomorrow.classList.remove("active"); renderAll(rowsToday,true); };
+  btnTomorrow.onclick=()=>{ if(btnTomorrow.disabled) return; btnTomorrow.classList.add("active"); btnToday.classList.remove("active"); renderAll(rowsTomorrow,false); };
 
   init();
-  setInterval(init, 30*60*1000); // periodisk uppfräschning
+  setInterval(init, 30*60*1000);
 })();
 </script>
 </html>
