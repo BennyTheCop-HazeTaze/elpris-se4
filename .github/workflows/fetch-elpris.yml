@@ -1,4 +1,4 @@
-name: Fetch elpriser (SE4)
+name: Fetch elpriser (Tibber)
 
 on:
   schedule:
@@ -16,27 +16,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          persist-credentials: true   # använd GITHUB_TOKEN för push
+          persist-credentials: true
 
-      - name: Hämta elpris-data (SE4) och spara i /data
-        shell: bash
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Hämta priser och förbrukning från Tibber
+        env:
+          TIBBER_TOKEN: ${{ secrets.TIBBER_TOKEN }}
+          TIBBER_HOME_ID: ${{ vars.TIBBER_HOME_ID }}
         run: |
-          set -e
-          mkdir -p data
-
-          # Datum i svensk tid
-          TODAY_PATH=$(TZ=Europe/Stockholm date +%Y/%m-%d)
-          TOMORROW_PATH=$(TZ=Europe/Stockholm date -d "tomorrow" +%Y/%m-%d)
-
-          # Dagens priser
-          curl -fsSL "https://www.elprisetjustnu.se/api/v1/prices/${TODAY_PATH}_SE4.json" -o data/today.json
-
-          # Morgondagens priser (kan saknas före ~13:15)
-          if curl -fsSL "https://www.elprisetjustnu.se/api/v1/prices/${TOMORROW_PATH}_SE4.json" -o data/tomorrow.json ; then
-            echo "Imorgon-data hämtad"
-          else
-            echo "Imorgon-data ej tillgänglig ännu – rör inte ev. befintlig fil."
-          fi
+          python tibber_to_json.py
+          echo "--- data/today.json ---"
+          head -c 400 data/today.json || true
+          echo ""
+          echo "--- data/stats.json ---"
+          cat data/stats.json || true
+          echo ""
 
       - name: Commit & push om något ändrats
         shell: bash
@@ -45,7 +46,7 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add -A
-            git commit -m "Update elpriser data"
+            git commit -m "Update Tibber price data"
             git push
           else
             echo "Inga ändringar att committa"
