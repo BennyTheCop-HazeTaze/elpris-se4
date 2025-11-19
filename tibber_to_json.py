@@ -4,7 +4,7 @@
 import os, sys, json, datetime as dt
 import requests
 
-API_URL = "https://data-api.tibber.com/v1-beta/gql"
+API_URL = "https://api.tibber.com/v1-beta/gql"
 
 QUERY = """
 query PriceAndConsumption($homeId: ID) {
