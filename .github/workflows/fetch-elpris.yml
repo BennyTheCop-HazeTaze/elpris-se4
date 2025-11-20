@@ -5,13 +5,13 @@ on:
     - cron: "*/30 * * * *"   # var 30:e minut
   workflow_dispatch:
 
-# Viktigt: ge token skrivbehörighet
 permissions:
   contents: write
 
 jobs:
   fetch:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,12 +29,20 @@ jobs:
       - name: Hämta priser och förbrukning från Tibber
         env:
           TIBBER_TOKEN: ${{ secrets.TIBBER_TOKEN }}
-          TIBBER_HOME_ID: ${{ vars.TIBBER_HOME_ID }}
+          TIBBER_HOME_ID: ${{ secrets.TIBBER_HOME_ID }} # eller vars om du föredrar
         run: |
+          echo "--- Kör tibber_to_json.py ---"
           python tibber_to_json.py
+          echo ""
+
+          echo "--- Kör tibber_stats.py ---"
+          python tibber_stats.py
+          echo ""
+
           echo "--- data/today.json ---"
           head -c 400 data/today.json || true
           echo ""
+
           echo "--- data/stats.json ---"
           cat data/stats.json || true
           echo ""
@@ -46,7 +54,7 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add -A
-            git commit -m "Update Tibber price data"
+            git commit -m "Update Tibber price and consumption stats"
             git push
           else
             echo "Inga ändringar att committa"
