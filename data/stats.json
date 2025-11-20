@@ -1,1 +1,18 @@
-{"last24h": {"kwh": 0.0, "cost": 0.0}, "last7d": {"kwh": 0.0, "cost": 0.0}}
+{
+  "generated_at": "2025-11-20T12:54:43Z",
+  "last24h": {
+    "kwh": 0.0,
+    "cost": 0.0,
+    "currency": null
+  },
+  "last7d": {
+    "kwh": 0.0,
+    "cost": 0.0,
+    "currency": null
+  },
+  "thisMonth": {
+    "kwh": 0.0,
+    "cost": 0.0,
+    "currency": null
+  }
+}
