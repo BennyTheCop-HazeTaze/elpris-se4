@@ -10,9 +10,9 @@ import requests
 API_URL = "https://api.tibber.com/v1-beta/gql"
 
 QUERY = """
-query PriceAndConsumption($homeId: ID) {
+query PriceAndConsumption {
   viewer {
-    homes(id: $homeId) {
+    homes {
       id
       currentSubscription {
         priceInfo {
@@ -104,7 +104,6 @@ def aggregate_consumption(nodes):
 
 def main():
     token = os.environ.get("TIBBER_TOKEN", "").strip()
-    home_id = os.environ.get("TIBBER_HOME_ID", "").strip() or None
 
     if not token:
         print("ERROR: Missing TIBBER_TOKEN environment variable.", file=sys.stderr)
@@ -116,8 +115,7 @@ def main():
     }
 
     payload = {
-        "query": QUERY,
-        "variables": {"homeId": home_id}
+        "query": QUERY
     }
 
     # --- API request ---
@@ -136,6 +134,7 @@ def main():
         if not homes:
             raise KeyError("No homes returned from Tibber API")
 
+        # Ta första hemmet
         home = homes[0]
 
         sub = home["currentSubscription"]
