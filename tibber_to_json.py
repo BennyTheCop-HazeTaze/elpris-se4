@@ -137,13 +137,24 @@ def main():
         # Ta första hemmet
         home = homes[0]
 
-        sub = home["currentSubscription"]
-        price_info = sub["priceInfo"] if sub else None
-        today_prices = price_info["today"] if price_info else []
-        tomorrow_prices = price_info["tomorrow"] if price_info else []
+        sub = home.get("currentSubscription")
+        price_info = sub.get("priceInfo") if sub else None
+        today_prices = price_info.get("today") if price_info else []
+        tomorrow_prices = price_info.get("tomorrow") if price_info else []
 
-        day_nodes = home["consumptionLastDay"]["nodes"]
-        week_nodes = home["consumptionLastWeek"]["nodes"]
+        # consumptionLastDay/Week kan vara null → hantera säkert
+        cons_day_obj = home.get("consumptionLastDay") or {}
+        cons_week_obj = home.get("consumptionLastWeek") or {}
+
+        day_nodes = cons_day_obj.get("nodes") or []
+        week_nodes = cons_week_obj.get("nodes") or []
+
+        if not day_nodes or not week_nodes:
+            print(
+                "WARN: Tibber GraphQL returned no consumption data "
+                "(consumptionLastDay/Week is null). stats.json will contain 0-values.",
+                file=sys.stderr,
+            )
 
     except Exception as e:
         print("ERROR parsing Tibber data:", e, file=sys.stderr)
@@ -183,9 +194,3 @@ def main():
     print(
         f"[OK] Prices today: {len(today_prices)} entries | "
         f"24h consumption: {day_kwh} kWh / {day_cost} kr | "
-        f"7d consumption: {week_kwh} kWh / {week_cost} kr"
-    )
-
-
-if __name__ == "__main__":
-    main()
