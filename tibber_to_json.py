@@ -115,8 +115,17 @@ def main():
     }
     payload = {"query": QUERY, "variables": {"homeId": home_id}}
 
-    r = requests.post(API_URL, headers=headers, json=payload, timeout=30)
-    r.raise_for_status()
+   r = requests.post(API_URL, headers=headers, json=payload, timeout=30)
+
+    # Debug: skriv ut fel från Tibber om något är galet
+    if r.status_code != 200:
+        print(f"ERROR from Tibber API (status {r.status_code}):", file=sys.stderr)
+        try:
+            print(r.text, file=sys.stderr)
+        except Exception:
+            pass
+        sys.exit(1)
+
     data = r.json()
 
     try:
