@@ -9,13 +9,14 @@ import requests
 
 API_URL = "https://api.tibber.com/v1-beta/gql"
 
+# Vi ber uttryckligen om QUARTER_HOURLY här:
 QUERY = """
 query PriceAndConsumption {
   viewer {
     homes {
       id
       currentSubscription {
-        priceInfo {
+        priceInfo(resolution: QUARTER_HOURLY) {
           today {
             startsAt
             total
@@ -54,7 +55,7 @@ def parse_iso(s: str) -> dt.datetime:
     return dt.datetime.fromisoformat(s.replace("Z", "+00:00"))
 
 def build_price_rows(prices):
-    """Return time_start/time_end rows supporting 1h or 15-min intervals."""
+    """Return time_start/time_end rows supporting 1h eller 15-min intervall."""
     if not prices:
         return []
 
@@ -139,17 +140,17 @@ def main():
 
     os.makedirs("data", exist_ok=True)
 
-    # Write today.json
+    # today.json
     with open("data/today.json", "w", encoding="utf-8") as f:
         json.dump(build_price_rows(today_prices), f, ensure_ascii=False)
 
-    # Write tomorrow.json
+    # tomorrow.json
     rows_tomorrow = build_price_rows(tomorrow_prices)
     if rows_tomorrow:
         with open("data/tomorrow.json", "w", encoding="utf-8") as f:
             json.dump(rows_tomorrow, f, ensure_ascii=False)
 
-    # Stats
+    # stats.json
     day_kwh, day_cost = aggregate_consumption(day_nodes)
     week_kwh, week_cost = aggregate_consumption(week_nodes)
 
@@ -161,9 +162,9 @@ def main():
     with open("data/stats.json", "w", encoding="utf-8") as f:
         json.dump(stats, f, ensure_ascii=False)
 
-    print("[OK] today:", len(today_prices), "entries")
-    print("[OK] consumption last 24h:", day_kwh, "kWh")
-    print("[OK] consumption last 7d:", week_kwh, "kWh")
+    print("[OK] entries today:", len(today_prices))
+    print("[OK] last24h:", day_kwh, "kWh,", day_cost, "kr")
+    print("[OK] last7d:", week_kwh, "kWh,", week_cost, "kr")
 
 
 if __name__ == "__main__":
