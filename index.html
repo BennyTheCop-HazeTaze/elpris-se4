@@ -47,11 +47,16 @@
   </div>
   <div class="footer">
     <div class="title">Elpris SE4</div>
-    <span id="liveNow" class="badge">Just nu: –</span>
+    <span id="liveNow"  class="badge">Just nu: –</span>
     <span id="statRange" class="badge">–</span>
     <span id="statAvg"   class="badge">–</span>
     <span id="statLow"   class="badge">–</span>
     <span id="statHigh"  class="badge">–</span>
+    <!-- NYA BADGES: kostnad / förbrukning -->
+    <span id="stat24h"   class="badge">24h: –</span>
+    <span id="stat7d"    class="badge">7d: –</span>
+    <span id="statMonth" class="badge">Månad: –</span>
+
     <div class="meta" id="stamp">–</div>
     <div class="group">
       <button class="btn" id="btnToday">Idag</button>
@@ -65,6 +70,7 @@
   const TZ="Europe/Stockholm", VAT=1.25, $=s=>document.querySelector(s);
   const chart=$("#chart");
   const statRange=$("#statRange"), statAvg=$("#statAvg"), statLow=$("#statLow"), statHigh=$("#statHigh"), stamp=$("#stamp"), liveNow=$("#liveNow");
+  const stat24h=$("#stat24h"), stat7d=$("#stat7d"), statMonth=$("#statMonth");
   const btnToday=$("#btnToday"), btnTomorrow=$("#btnTomorrow");
 
   new ResizeObserver(es=>{
@@ -75,11 +81,17 @@
   }).observe(document.querySelector('#wrap'));
 
   const bust=()=>`?v=${Date.now()}`;
-  const URL_TODAY="./data/today.json"+bust(), URL_TOMORROW="./data/tomorrow.json"+bust();
+  const URL_TODAY   ="./data/today.json"   + bust();
+  const URL_TOMORROW="./data/tomorrow.json"+ bust();
+  const URL_STATS   ="./data/stats.json"   + bust();
 
   let rowsToday=null, rowsTomorrow=null;
 
-  async function fetchJson(u){ const r=await fetch(u,{cache:'no-store'}); if(!r.ok) throw new Error(r.status); return r.json(); }
+  async function fetchJson(u){
+    const r=await fetch(u,{cache:'no-store'});
+    if(!r.ok) throw new Error(r.status);
+    return r.json();
+  }
 
   function toSeries(rows){
     return rows.map(r=>{
@@ -89,6 +101,7 @@
       return {ts,te,value,label};
     });
   }
+
   function computeLevels(series){
     const arr=series.map(d=>d.value).slice().sort((a,b)=>a-b);
     const t33=arr[Math.floor((arr.length-1)*0.33)], t66=arr[Math.floor((arr.length-1)*0.66)];
@@ -97,9 +110,13 @@
       else d.level=(d.value<=t33)?"green":(d.value<=t66)?"yellow":"red";
     });
   }
-  const nf0=new Intl.NumberFormat('sv-SE',{maximumFractionDigits:0});
-  const nf2=new Intl.NumberFormat('sv-SE',{minimumFractionDigits:2,maximumFractionDigits:2});
-  const fmt0=n=>nf0.format(n), fmt10=n=>nf0.format(Math.round(n/10)*10);
+
+  const nf0 = new Intl.NumberFormat('sv-SE',{maximumFractionDigits:0});
+  const nf2 = new Intl.NumberFormat('sv-SE',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const nfKwh   = new Intl.NumberFormat('sv-SE',{minimumFractionDigits:1,maximumFractionDigits:1});
+  const nfMoney = new Intl.NumberFormat('sv-SE',{minimumFractionDigits:0,maximumFractionDigits:0});
+  const fmt0  = n=>nf0.format(n);
+  const fmt10 = n=>nf0.format(Math.round(n/10)*10);
 
   function renderStats(series){
     const v=series.map(d=>d.value), lo=Math.min(...v), hi=Math.max(...v), avg=v.reduce((a,b)=>a+b,0)/v.length;
@@ -110,9 +127,34 @@
     statLow.textContent  =`Lägst: ${fmt0(lo)} öre/kWh (${tf(series[iLo])})`;
     statHigh.textContent =`Högst: ${fmt0(hi)} öre/kWh (${tf(series[iHi])})`;
   }
+
   function stampDate(isToday){
     const f=new Intl.DateTimeFormat('sv-SE',{weekday:'short',day:'2-digit',month:'short'});
     stamp.textContent=(isToday?"Idag ":"Imorgon ")+f.format(isToday?new Date():new Date(Date.now()+86400000));
+  }
+
+  // --- NY: rendera stats.json till badges 24h / 7d / månad ---
+  function renderCostBadges(stats){
+    // default: visa bara streck
+    const setEmpty = () => {
+      stat24h.textContent   = "24h: –";
+      stat7d.textContent    = "7d: –";
+      statMonth.textContent = "Månad: –";
+    };
+    if(!stats){
+      setEmpty();
+      return;
+    }
+    const makeLine = (obj,label)=>{
+      if(!obj || obj.currency==null || (obj.kwh===0 && obj.cost===0)){
+        return `${label}: –`;
+      }
+      const cur = obj.currency === "SEK" ? "kr" : obj.currency;
+      return `${label}: ${nfKwh.format(obj.kwh)} kWh / ${nfMoney.format(obj.cost)} ${cur}`;
+    };
+    stat24h.textContent   = makeLine(stats.last24h,"24h");
+    stat7d.textContent    = makeLine(stats.last7d,"7d");
+    statMonth.textContent = makeLine(stats.thisMonth,"Månad");
   }
 
   function drawFullDay(series){
@@ -183,7 +225,6 @@
     const isQuarter = n>48;
     let every=1; if(barW<28) every=2; if(barW<20) every=3; if(barW<15) every=4;
 
-    // ---- UPPIFRÅN OCH NED VERSION ----
     function drawStackedDigits(xCenter, yTop, height, value, minFont){
       let str = String(Math.round(value));
       const neg = str[0]==='-' || str[0]==='−';
@@ -249,17 +290,33 @@
   }
 
   async function init(){
-    try{ rowsToday=await fetchJson(URL_TODAY);}catch{ rowsToday=[]; }
-    try{ rowsTomorrow=await fetchJson(URL_TOMORROW);}catch{ rowsTomorrow=null; }
+    try{ rowsToday   = await fetchJson(URL_TODAY);    }catch{ rowsToday=[]; }
+    try{ rowsTomorrow= await fetchJson(URL_TOMORROW);}catch{ rowsTomorrow=null; }
+    let stats = null;
+    try{ stats = await fetchJson(URL_STATS); }catch{ stats = null; }
+
+    renderCostBadges(stats);
+
     btnTomorrow.disabled = !(rowsTomorrow && rowsTomorrow.length);
     btnToday.classList.add("active");
+    btnTomorrow.classList.remove("active");
     renderAll(rowsToday,true);
   }
 
-  btnToday.onclick =()=>{ btnToday.classList.add("active"); btnTomorrow.classList.remove("active"); renderAll(rowsToday,true); };
-  btnTomorrow.onclick=()=>{ if(btnTomorrow.disabled) return; btnTomorrow.classList.add("active"); btnToday.classList.remove("active"); renderAll(rowsTomorrow,false); };
+  btnToday.onclick =()=>{
+    btnToday.classList.add("active");
+    btnTomorrow.classList.remove("active");
+    renderAll(rowsToday,true);
+  };
+  btnTomorrow.onclick=()=>{
+    if(btnTomorrow.disabled) return;
+    btnTomorrow.classList.add("active");
+    btnToday.classList.remove("active");
+    renderAll(rowsTomorrow,false);
+  };
 
   init();
+  // pris + stats kan uppdateras i bakgrunden var 30:e minut
   setInterval(init, 30*60*1000);
 })();
 </script>
