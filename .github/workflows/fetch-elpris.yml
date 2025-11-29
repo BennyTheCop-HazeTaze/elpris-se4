@@ -2,7 +2,12 @@ name: Fetch elpriser (Tibber)
 
 on:
   schedule:
-    - cron: "*/30 * * * *"   # var 30:e minut
+    # Uppdatera tätare under tiden Tibber släpper morgondagens priser
+    - cron: "*/15 11-15 * * *"
+
+    # En gång i timmen övrig tid
+    - cron: "0 * * * *"
+
   workflow_dispatch:
 
 permissions:
