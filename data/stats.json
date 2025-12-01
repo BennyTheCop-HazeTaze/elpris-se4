@@ -1,13 +1,13 @@
 {
-  "generated_at": "2025-12-01T05:33:46Z",
+  "generated_at": "2025-12-01T06:42:19Z",
   "last24h": {
-    "kwh": 44.609,
-    "cost": 19.85,
+    "kwh": 50.381,
+    "cost": 23.78,
     "currency": "SEK"
   },
   "last7d": {
-    "kwh": 22.494,
-    "cost": 12.46,
+    "kwh": 22.478,
+    "cost": 12.45,
     "currency": "SEK"
   },
   "thisMonth": {
