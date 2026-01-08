@@ -1,18 +1,18 @@
 {
-  "generated_at": "2026-01-08T17:32:58Z",
+  "generated_at": "2026-01-08T18:37:56Z",
   "last24h": {
-    "kwh": 36.684,
-    "cost": 43.31,
+    "kwh": 41.71,
+    "cost": 57.98,
     "currency": "SEK"
   },
   "last7d": {
     "kwh": 222.736,
-    "cost": 271.72,
+    "cost": 269.27,
     "currency": "SEK"
   },
   "thisMonth": {
     "kwh": 222.736,
-    "cost": 271.72,
+    "cost": 269.27,
     "currency": "SEK"
   }
 }
